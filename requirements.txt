@@ -2,7 +2,7 @@
 # Hard Constraint 1 of the brief: NO agentic frameworks.
 # LangChain, LangGraph, CrewAI, AutoGen and equivalents are deliberately
 # absent. The reasoning layer in app/reasoning/ is hand-written and talks to
-# the LLM through the plain `openai` SDK only.
+# the LLM through Groq's plain SDK only.
 # ---------------------------------------------------------------------------
 
 # --- Detection (Hard Constraint 2: RT-DETR, own training code) ---
@@ -23,7 +23,10 @@ pydantic>=2.7
 python-multipart>=0.0.9
 
 # --- Reasoning layer (plain SDK, no framework) ---
-openai>=1.40
+# Groq's own SDK. It is a thin HTTP client over their chat-completions
+# endpoint - it does not chain, plan, or orchestrate anything. All of the
+# routing and reasoning logic lives in app/reasoning/ and is mine.
+groq>=0.11
 
 # --- Evaluation / reporting ---
 matplotlib>=3.8

@@ -393,3 +393,51 @@ I am doing it anyway because the time budget forces it, and I would rather
 report the limitation honestly than run out of session. I am noting the
 prediction here, before training, so that when those classes come out worst I
 can point at this paragraph rather than claim after the fact that I expected it.
+
+---
+
+## Switching the reasoning layer to Groq
+
+I had planned this around OpenAI and moved to Groq. Two reasons, one practical
+and one that turned out to matter more than I expected.
+
+**The practical one:** Groq's free tier is genuinely usable, and inference is
+fast enough that the two-call structure of my reasoning layer (route, then
+synthesise) does not add noticeable latency to an API request. With a slower
+provider I would have been tempted to collapse the two calls into one, which
+would have been the wrong call architecturally — the whole point is that routing
+and answering are separate decisions.
+
+**The one I did not anticipate:** Groq supports `json_schema` with
+`strict: true`, which uses constrained decoding rather than prompting. The
+model is *structurally unable* to emit output that does not match my schema.
+
+That matters for the router specifically. My original plan was to ask for JSON
+in the prompt, parse it, and write retry logic for when the model returned prose
+or a malformed object — that is the usual dance. With constrained decoding, the
+router's output being well-formed stops being something I hope for and becomes
+something the decoder guarantees. I still validate the parsed object in code,
+because "well-formed" and "sensible" are different claims and I only get the
+first one for free.
+
+**One deprecation I had to work around.** My first choice was
+`llama-3.3-70b-versatile`, which is the obvious Groq default. Checking the docs
+rather than assuming, I found it was deprecated for free and developer tier in
+June 2026, with `openai/gpt-oss-120b` given as the migration path. So I am on
+the gpt-oss models. Worth recording because it is exactly the kind of thing that
+silently breaks a submission a reviewer tries to run three weeks later.
+
+**Why two different models.** The router and the synthesiser are doing different
+jobs and I sized them differently:
+
+- *Routing* is classification into a fixed schema. Small, fast model
+  (`gpt-oss-20b`), pinned with strict structured output.
+- *Synthesis* is open-ended writing that has to respect a guardrail verdict.
+  Larger model (`gpt-oss-120b`), where the extra capability earns its latency.
+
+**On the no-frameworks constraint:** the `groq` package is a thin HTTP client
+over their chat-completions endpoint. It does not chain, plan, retry-with-tools,
+or orchestrate anything. Every decision about what to call, when to call it, and
+what to do with the result lives in `app/reasoning/` and is code I wrote. I did
+a dependency grep for LangChain, LangGraph, CrewAI and AutoGen as a final check
+and recorded the result in the README.

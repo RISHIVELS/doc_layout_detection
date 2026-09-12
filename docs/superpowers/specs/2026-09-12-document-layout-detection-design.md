@@ -198,7 +198,7 @@ Image + natural-language question -> reasoned answer.
 ## 6. Part B — reasoning layer
 
 Hand-written. No LangChain, LangGraph, CrewAI, AutoGen, or equivalent anywhere
-in the codebase (Hard Constraint 1). Plain `openai` SDK calls only.
+in the codebase (Hard Constraint 1). Plain `groq` SDK calls only.
 
 ```
 /ask(image, question)
@@ -206,7 +206,7 @@ in the codebase (Hard Constraint 1). Plain `openai` SDK calls only.
  1. INTENT ROUTER  (app/reasoning/router.py)
     - Deterministic regex prefilter short-circuits obviously non-visual
       questions before spending a token.
-    - One LLM call with a strict JSON schema, given the model's class
+    - One Groq call with strict json_schema (constrained decoding), given the model's class
       vocabulary:
         {needs_detection, target_classes, task_type, reason}
       task_type in {count, presence, compare, describe, out_of_scope}
@@ -320,7 +320,7 @@ the reviewers on the hidden evaluation set.
 
 | # | Constraint | How satisfied |
 |---|---|---|
-| 1 | No agentic frameworks | Plain `openai` SDK. No LangChain/LangGraph/CrewAI/AutoGen. Verified by dependency audit of `requirements.txt`. |
+| 1 | No agentic frameworks | Plain `groq` SDK. No LangChain/LangGraph/CrewAI/AutoGen. Verified by dependency audit of `requirements.txt`. |
 | 2 | No AutoML; own code; RT-DETR | Ultralytics RT-DETR, own training/eval scripts. |
 | 3 | >= 1 non-COCO class | All 11 classes are non-COCO. |
 | 4 | Reproducibility | Seeds, hyperparameters, GPU model, wall-clock time, exact commands in README. |

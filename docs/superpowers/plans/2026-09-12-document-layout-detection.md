@@ -6,13 +6,13 @@
 
 **Architecture:** Ultralytics RT-DETR-L fine-tuned on an 8k-image DocLayNet subset (11 non-COCO classes), trained on Kaggle T4. A FastAPI app wraps the weights with two endpoints: `/detect` returns raw detections; `/ask` runs a four-stage hand-written pipeline — regex prefilter, LLM intent router, deterministic evidence builder, deterministic confidence guardrail — then synthesises an answer from structured evidence only. The LLM never receives pixels.
 
-**Tech Stack:** Python 3.11, Ultralytics (RT-DETR), PyTorch, HuggingFace `datasets`, FastAPI, Pydantic v2, `openai` SDK, pytest, Docker.
+**Tech Stack:** Python 3.11, Ultralytics (RT-DETR), PyTorch, HuggingFace `datasets`, FastAPI, Pydantic v2, `groq` SDK, pytest, Docker.
 
 **Spec:** `docs/superpowers/specs/2026-09-12-document-layout-detection-design.md`
 
 ## Global Constraints
 
-- **No agentic frameworks.** LangChain, LangGraph, CrewAI, AutoGen or equivalent must not appear in `requirements.txt`, imports, or vendored code. Plain `openai` SDK only.
+- **No agentic frameworks.** LangChain, LangGraph, CrewAI, AutoGen or equivalent must not appear in `requirements.txt`, imports, or vendored code. Plain `groq` SDK only.
 - **Detector must be RT-DETR.** Ultralytics `RTDETR('rtdetr-l.pt')`.
 - **All 11 DocLayNet classes trained.** No class trimming.
 - **Class list, fixed order (0-indexed):** `Caption`, `Footnote`, `Formula`, `List-item`, `Page-footer`, `Page-header`, `Picture`, `Section-header`, `Table`, `Text`, `Title`
@@ -84,7 +84,7 @@ def test_id_maps_are_inverses():
 - [ ] **Step 2: Run test to verify it fails** — `pytest tests/test_constants.py -v`. Expected: `ModuleNotFoundError: app.constants`.
 - [ ] **Step 3: Implement `app/constants.py`** — the list above, plus derived dicts and `MODEL_VERSION = "rtdetr-l-doclaynet-v1"`.
 - [ ] **Step 4: Run test to verify it passes** — `pytest tests/test_constants.py -v`. Expected: 3 passed.
-- [ ] **Step 5: Write `requirements.txt`** pinning: `ultralytics`, `torch`, `datasets`, `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `openai`, `python-multipart`, `pillow`, `numpy`, `pytest`. **No LangChain/LangGraph/CrewAI/AutoGen.**
+- [ ] **Step 5: Write `requirements.txt`** pinning: `ultralytics`, `torch`, `datasets`, `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `groq`, `python-multipart`, `pillow`, `numpy`, `pytest`. **No LangChain/LangGraph/CrewAI/AutoGen.**
 - [ ] **Step 6: Commit** — `git add -A && git commit -m "feat: project scaffolding and DocLayNet class constants"`
 
 ---
@@ -357,7 +357,7 @@ def test_prefilter_defers_ambiguous_questions_to_the_llm():
 ```
 
 - [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement `prefilter` then `route`.** `route` makes one `openai` call with `response_format={"type": "json_schema"}` and a strict schema, injecting `CLASS_NAMES` into the prompt so the model knows the perception vocabulary. **The prompt must state that questions about text *content* (amounts, names, dates, signatures) are `out_of_scope`, because the detector returns layout regions only.** On LLM error or timeout, fail closed: return `needs_detection=False, task_type="out_of_scope"` with the error in `reason`.
+- [ ] **Step 3: Implement `prefilter` then `route`.** `route` makes one Groq call with `response_format={"type": "json_schema"}` and a strict schema, injecting `CLASS_NAMES` into the prompt so the model knows the perception vocabulary. **The prompt must state that questions about text *content* (amounts, names, dates, signatures) are `out_of_scope`, because the detector returns layout regions only.** On LLM error or timeout, fail closed: return `needs_detection=False, task_type="out_of_scope"` with the error in `reason`.
 - [ ] **Step 4: Run to verify they pass** — 3 passed.
 - [ ] **Step 5: Manual check with a real key** — verify `"What is the invoice total?"` routes to `out_of_scope` and `"How many tables?"` routes to `count` with `target_classes=["Table"]`. Record both for the memo.
 - [ ] **Step 6: Commit** — `git commit -m "feat: hand-written intent router with fail-closed behaviour"`
