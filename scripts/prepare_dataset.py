@@ -255,7 +255,13 @@ def _render_label_check(dataset, out_dir: Path, sample_size: int) -> None:
     """
     from PIL import ImageDraw
 
-    check_dir = out_dir.parent / "assets" / "label_check"
+    # Writing straight into out_dir rather than climbing to its parent, same
+    # as prep_report.json and doclaynet.yaml below. My first version reached
+    # up to out_dir.parent, which put this somewhere I then pointed the
+    # notebook's check-cell at incorrectly - "up one, then back down two"
+    # is exactly the kind of path arithmetic that is easy to get wrong once
+    # and never notice, because the directory still gets created either way.
+    check_dir = out_dir / "label_check"
     check_dir.mkdir(parents=True, exist_ok=True)
 
     rows = dataset["train"]

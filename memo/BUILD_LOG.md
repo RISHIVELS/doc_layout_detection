@@ -683,3 +683,31 @@ Part B is now fully wired end to end: router -> evidence -> guardrail ->
 synthesis, all tested with stubs so none of it needed a GPU or a live Groq
 key to verify. The only thing left to check by hand, once a key is available,
 is that a real Groq call actually produces the JSON shape I am parsing.
+
+---
+
+## Fifth snag — the label-check images existed, I just pointed at the wrong folder
+
+`--verify` ran, reported writing 12 pages, and the notebook's check cell said
+"0 pages to check". Not a data problem this time - a path bug in my own code.
+
+`_render_label_check` computed its output directory as
+`out_dir.parent / "assets" / "label_check"`. With `--out
+/kaggle/working/data/doclaynet`, that climbs up to `/kaggle/working/data` and
+back down into `assets/label_check` - i.e.
+`/kaggle/working/data/assets/label_check`. My notebook cell, written
+separately, checked `/kaggle/working/assets/label_check` - missing the `data/`
+segment. Two pieces of code, two different guesses at the same path, and
+nothing enforced they agreed.
+
+Fixed by removing the parent-climbing entirely: the renders now go straight
+into `out_dir / "label_check"`, the same way `prep_report.json` and
+`doclaynet.yaml` already do. One clear rule - everything this script produces
+lives under the directory you passed to `--out` - instead of one output path
+being special-cased to live somewhere else.
+
+The pattern across all five of today's snags is the same: nothing here was a
+modelling mistake, and every one of them was invisible until I actually ran
+the thing on real infrastructure with a fresh checkout. That is exactly why
+this log exists - a memo written after a single clean run would have no idea
+any of this happened.
