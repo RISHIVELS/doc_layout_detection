@@ -268,3 +268,60 @@ from it. `tests/test_constants.py` pins the ordering.
 ---
 
 *(log continues as the build progresses)*
+
+### Dataset conversion — the part that nearly caught me out
+
+I expected this to be a twenty-minute job: read the Hugging Face rows, convert
+the boxes, write the files. It was not, and the reason is worth recording
+because it is the kind of thing that decides whether a submission is real.
+
+**What I found when I looked at the schema.** DocLayNet-base stores
+`bboxes_block` aligned to *text lines*, not to regions. A paragraph spanning six
+lines appears as the same block box repeated six times, each with the same
+category. One sample row had over a thousand entries in `bboxes_block` for a page
+that plainly contains a few dozen actual regions.
+
+If I had written those out as labels directly — which is exactly what a
+straightforward loop over the dataset does — I would have produced a training set
+where the average page carries a thousand overlapping annotations. Nothing about
+that crashes. The loss still goes down. The model would simply have learned a
+completely wrong prior about how many objects a page contains, and I would have
+spent the evening wondering why my precision was strange.
+
+So `dedupe_annotations()` collapses on the `(box, category)` pair. I dedupe on
+the pair rather than the box alone because occasionally two classes are labelled
+over the same extent, and dropping one of those would be discarding real signal.
+The prep report prints what fraction of the raw annotations were repeats, because
+"I threw away most of the annotations" is a claim that needs a number next to it.
+
+**The three things I tested before writing the driver.** I do not normally write
+tests for a one-off conversion script. I did here because every failure mode in
+this file is silent:
+
+- *Coordinate conversion.* DocLayNet uses top-left-corner `[x, y, w, h]`;
+  Ultralytics wants normalised centre coordinates. Forget the corner-to-centre
+  shift and every box lands half its own size up and to the left — which reads as
+  "the model localises a bit imprecisely", not as a bug.
+- *Deduplication.* Described above.
+- *Degenerate boxes.* Zero-area labels are accepted by Ultralytics and then
+  produce NaN losses several epochs in, long after I have stopped watching the
+  console.
+
+**The check no test can do.** My class ordering is 0-indexed alphabetical, which
+I inferred from the data rather than found stated unambiguously. If it is off by
+one, `Table` becomes `Section-header` everywhere. The dataset stays perfectly
+self-consistent, training succeeds, and every metric and failure-case analysis I
+write afterwards describes a model that learned something other than what I say
+it learned.
+
+No unit test catches that, because the data is internally consistent under either
+assumption. The only check that works is rendering pages with the decoded names
+drawn on the boxes and looking at them. That is what `--verify` does, and running
+it is a hard gate before training in my notebook. It felt paranoid to build; it is
+the cheapest insurance in the project.
+
+**One small design choice:** the script generates `doclaynet.yaml` itself instead
+of me hand-writing it, so the class names in the training config physically
+cannot drift from `app/constants.py`. That is the same drift bug I consolidated
+the class list to avoid, and hand-writing the YAML would have reintroduced it
+through the back door.
