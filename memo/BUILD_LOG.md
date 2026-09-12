@@ -647,3 +647,39 @@ stricter library default. I am recording each one because "reproducibility"
 in the brief's sense includes surviving exactly this kind of environment
 drift, and a submission that only ever ran once, on one machine, would never
 have surfaced any of it.
+
+---
+
+## Finishing Part B: synthesis and the pipeline
+
+synthesize() ended up being the smallest module in app/reasoning/, on purpose.
+By the time it runs, the router has already decided whether detection was
+needed and the guardrail has already decided whether the evidence is good
+enough - synthesize()'s only remaining job is phrasing an answer from the
+evidence JSON. I gave it the larger Groq model (gpt-oss-120b) rather than the
+router's small one, because this is the one genuinely open-ended writing step
+in the pipeline, versus routing which is a closed classification problem the
+small model handles fine under strict schema constraints.
+
+I also gave it a template-based fallback for when the Groq call itself fails.
+If synthesis is unavailable, the API should still say what it found (or why
+it can't answer) rather than 500 - the phrasing step failing should not take
+down the honesty guarantees the guardrail already established.
+
+pipeline.py is deliberately close to logic-free. It routes, conditionally
+detects, builds evidence, checks the guardrail, and synthesises - in that
+order - and every one of those steps' actual decisions lives in its own
+tested module. The one line in this file I care about most:
+`insufficient = verdict.triggered`, set directly from my own deterministic
+guardrail output, never from parsing the LLM's wording for hedging language.
+I wrote a test specifically for this
+(test_guardrail_verdict_overrides_whatever_the_llm_says) that hands the
+pipeline a stub LLM returning a completely confident-sounding sentence on
+evidence that should trip the guardrail, and asserts
+insufficient_information is still True. That test is really the whole
+argument of Part B compressed into one assertion.
+
+Part B is now fully wired end to end: router -> evidence -> guardrail ->
+synthesis, all tested with stubs so none of it needed a GPU or a live Groq
+key to verify. The only thing left to check by hand, once a key is available,
+is that a real Groq call actually produces the JSON shape I am parsing.
