@@ -169,6 +169,23 @@ def _write_split(
         "doc_category_counts": Counter(),
     }
 
+    """
+    I keep a per-image manifest as well as the aggregate counts.
+
+    The counts alone tell me the dataset is balanced; the manifest is what lets
+    evaluate.py split mAP by document category afterwards. I need that because
+    one aggregate number cannot tell me whether the model learned document
+    structure or just learned what financial reports look like - and financial
+    reports are the biggest slice of DocLayNet, so a model that is good at those
+    and useless on patents would still post a respectable headline score.
+
+    I also record the source PDF filename here. DocLayNet pages come from
+    multi-page documents, so if pages from the same PDF ended up on both sides
+    of the train/test boundary my test numbers are optimistic. I would rather
+    measure that overlap and report it than assume it is zero.
+    """
+    manifest: list[dict] = []
+
     for index in range(total):
         row = rows[index]
         image = row["image"]
@@ -197,11 +214,23 @@ def _write_split(
         image.convert("RGB").save(image_dir / f"{stem}.png")
         (label_dir / f"{stem}.txt").write_text("\n".join(lines), encoding="utf-8")
 
-        stats["doc_category_counts"][row.get("doc_category", "unknown")] += 1
+        doc_category = row.get("doc_category", "unknown")
+        stats["doc_category_counts"][doc_category] += 1
         stats["images"] += 1
+
+        manifest.append({
+            "stem": stem,
+            "doc_category": doc_category,
+            "source_pdf": row.get("original_filename", "unknown"),
+            "num_regions": len(lines),
+        })
 
         if stats["images"] % 500 == 0:
             print(f"  {split_name}: {stats['images']}/{total}", flush=True)
+
+    (out_dir / f"manifest_{split_name}.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
 
     stats["class_counts"] = dict(stats["class_counts"])
     stats["doc_category_counts"] = dict(stats["doc_category_counts"])
