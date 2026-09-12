@@ -508,3 +508,26 @@ library's structure, nothing else.
 Two real dependency snags inside the first ten minutes of actually running
 this on Kaggle, both invisible until I hit real infrastructure rather than my
 own laptop. I am glad I budgeted slack for exactly this.
+
+---
+
+## Third Kaggle snag — rm -rf on the shell's own current directory
+
+```
+shell-init: error retrieving current directory: getcwd: cannot access parent
+directories: No such file or directory
+fatal: Unable to read current working directory
+```
+
+Kaggle-specific, not a repo problem. My clone cell did `%cd /kaggle/working/repo`
+at the end, so re-running the same cell later (which happens naturally every
+time I push a fix and need the latest code) executed `rm -rf
+/kaggle/working/repo` while the notebook's shell was sitting inside that exact
+directory. The process's cached working directory pointed at a path that had
+just been deleted, and every subsequent `!` command inherited the broken state.
+
+Fix: `%cd /kaggle/working` before the `rm -rf`, so the cell always steps out to
+a stable parent directory first. Small, but it is the difference between the
+clone cell being safely re-runnable and it corrupting the session on the second
+run - and I am re-running it after almost every fix in this log, so it needed
+to be safe to repeat.
