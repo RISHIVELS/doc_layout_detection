@@ -475,3 +475,36 @@ trace from inside the `datasets` internals.
 The honest lesson: an unpinned floor-only dependency is a real reproducibility
 gap, not a theoretical one. It cost me a run failure inside the first few
 minutes of using the one GPU session I had.
+
+---
+
+## Second Kaggle snag — an interactive prompt with nothing to answer it
+
+Right after the datasets<4.0.0 fix, the next run got as far as actually loading
+the dataset and then stopped on:
+
+```
+The repository for pierreguillou/DocLayNet-base contains custom code which
+must be executed to correctly load the dataset...
+Do you wish to run the custom code? [y/N]
+```
+
+This is `datasets` asking permission to execute the dataset repo's own loading
+script - a sensible default, since blindly running someone else's code off the
+Hub is not something a library should do silently.
+
+I answered it interactively to keep checking labels, but the real fix has to
+be in code, because my actual training run does not happen interactively: the
+plan is Save & Run All (Commit) specifically so the session survives me
+closing the browser, per Task 5. A commit run has no terminal on the other end
+to type "y" into - it would sit at that prompt until the session timed out,
+and I would come back hours later to a run that never started.
+
+Fix: pass `trust_remote_code=True` explicitly in `prepare_dataset.py`. I did
+look at what I was agreeing to run before adding it - the script is
+`pierreguillou`'s own conversion of IBM's DocLayNet into the `datasets`
+library's structure, nothing else.
+
+Two real dependency snags inside the first ten minutes of actually running
+this on Kaggle, both invisible until I hit real infrastructure rather than my
+own laptop. I am glad I budgeted slack for exactly this.

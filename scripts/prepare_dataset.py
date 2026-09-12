@@ -306,7 +306,26 @@ def main() -> None:
 
     print(f"Loading {HF_DATASET} (3.8 GB on first run, cached after)...", flush=True)
     try:
-        dataset = load_dataset(HF_DATASET)
+        """
+        trust_remote_code=True is required because this dataset repo is the
+        legacy "loading script" format: it ships a small Python file
+        (DocLayNet-base.py) that datasets executes to build the dataset,
+        rather than reading a static Parquet/Arrow file directly.
+
+        Without this flag, `datasets` stops and asks for interactive
+        confirmation before running someone else's code - a sensible default
+        for a random dataset off the Hub. It also means the prompt blocks
+        forever in a non-interactive run, which is exactly how I run this: the
+        Kaggle notebook uses Save & Run All (Commit) so the session survives
+        me closing the browser, and there is no terminal on the other end to
+        type "y" into.
+
+        I am passing it explicitly rather than just suppressing the prompt,
+        because I looked at what the script does before trusting it: it is
+        the dataset author's own conversion of IBM's DocLayNet into the
+        HF `datasets` structure, nothing more.
+        """
+        dataset = load_dataset(HF_DATASET, trust_remote_code=True)
     except RuntimeError as error:
         """
         This is the one dependency failure I actually hit while building this,
