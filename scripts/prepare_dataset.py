@@ -302,7 +302,44 @@ def main() -> None:
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    from datasets import ClassLabel, Features, Sequence, Value
     from datasets import load_dataset
+    from datasets.features import Image as HFImage
+
+    """
+    The dataset repo's own loading script declares bboxes_block/bboxes_line
+    as Sequence(Sequence(Value("int64"))). That is simply wrong - the actual
+    coordinates in the underlying data are floats (I hit one directly:
+    139.664355). Older pyarrow used to silently floor a float into that int64
+    slot; a newer pyarrow (which is what Kaggle ships) refuses the lossy cast
+    outright and the whole load fails with `ArrowInvalid: Float value ...
+    was truncated converting to int64`.
+
+    I cannot edit someone else's script on the Hub, but `load_dataset` lets me
+    override the schema it builds against. So I reconstruct the script's exact
+    feature dict from source and correct only the two fields that are wrong,
+    to float64. Everything else is left byte-for-byte identical to the
+    original so I am not silently changing anything I have not verified needs
+    changing.
+    """
+    doclaynet_features = Features({
+        "id": Value("string"),
+        "texts": Sequence(Value("string")),
+        "bboxes_block": Sequence(Sequence(Value("float64"))),
+        "bboxes_line": Sequence(Sequence(Value("float64"))),
+        "categories": Sequence(ClassLabel(names=CLASS_NAMES)),
+        "image": HFImage(),
+        "page_hash": Value("string"),
+        "original_filename": Value("string"),
+        "page_no": Value("int32"),
+        "num_pages": Value("int32"),
+        "original_width": Value("int32"),
+        "original_height": Value("int32"),
+        "coco_width": Value("int32"),
+        "coco_height": Value("int32"),
+        "collection": Value("string"),
+        "doc_category": Value("string"),
+    })
 
     print(f"Loading {HF_DATASET} (3.8 GB on first run, cached after)...", flush=True)
     try:
@@ -325,7 +362,7 @@ def main() -> None:
         the dataset author's own conversion of IBM's DocLayNet into the
         HF `datasets` structure, nothing more.
         """
-        dataset = load_dataset(HF_DATASET, trust_remote_code=True)
+        dataset = load_dataset(HF_DATASET, trust_remote_code=True, features=doclaynet_features)
     except RuntimeError as error:
         """
         This is the one dependency failure I actually hit while building this,

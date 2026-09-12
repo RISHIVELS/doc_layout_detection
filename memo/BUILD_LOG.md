@@ -598,3 +598,52 @@ I thought about the alternative (fail open, assume detection is needed) and
 decided it is the wrong default: skipping a real, answerable question is a
 worse failure than declining one that could have been answered, because the
 second failure mode still tells the user something true.
+
+---
+
+## Fourth Kaggle snag — the dataset repo's own schema is wrong
+
+```
+pyarrow.lib.ArrowInvalid: Float value 139.664355 was truncated converting to int64
+```
+
+This one is not my bug, and it is worth being precise about why, because
+"it's not my fault" is exactly the kind of claim that needs evidence attached
+to it rather than being asserted.
+
+I pulled the dataset repo's actual loading script
+(`DocLayNet-base.py`, on the Hub) and read the feature schema it declares:
+
+```python
+"bboxes_block": datasets.Sequence(datasets.Sequence(datasets.Value("int64"))),
+"bboxes_line": datasets.Sequence(datasets.Sequence(datasets.Value("int64"))),
+```
+
+The actual box coordinates in the underlying data are floats - I have one
+directly from the traceback, 139.664355. That is simply a wrong schema
+declaration in a dataset script last touched around 2023. Older `pyarrow`
+versions used to cast a float into an int64 slot by silently flooring it,
+which is lossy but does not error. Kaggle's installed `pyarrow` is new enough
+that it now refuses that cast outright rather than silently corrupting data,
+which is the right thing for pyarrow to do - it just means this particular
+legacy script has been broken by a stricter, safer default in a library it
+depends on.
+
+I cannot edit someone else's script on the Hub. What I can do is override the
+schema `load_dataset` builds against: it accepts a `features` argument
+("Set the features type to use for this dataset" - confirmed straight from
+the installed library's own docstring before I relied on it) that gets
+forwarded into the builder and used for the actual arrow-writing cast. I
+reconstructed the script's feature dict field-for-field from its source and
+changed only the two wrong entries to `float64`, leaving everything else
+untouched so I am not silently changing anything I have not specifically
+verified needs changing.
+
+Three real infrastructure failures in a row now, all inside the first fifteen
+minutes of actually running this outside my own machine. None of them were
+wrong logic on my part - a floor-only version pin, an interactive prompt with
+no interactive terminal, and someone else's incorrect schema meeting a
+stricter library default. I am recording each one because "reproducibility"
+in the brief's sense includes surviving exactly this kind of environment
+drift, and a submission that only ever ran once, on one machine, would never
+have surfaced any of it.
