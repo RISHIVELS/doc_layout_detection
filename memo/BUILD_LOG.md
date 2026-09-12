@@ -441,3 +441,37 @@ or orchestrate anything. Every decision about what to call, when to call it, and
 what to do with the result lives in `app/reasoning/` and is code I wrote. I did
 a dependency grep for LangChain, LangGraph, CrewAI and AutoGen as a final check
 and recorded the result in the README.
+
+---
+
+## First real failure on Kaggle — an unpinned dependency
+
+The first thing that actually broke wasn't my code, it was a version I hadn't
+pinned tightly enough. Worth recording in full because it is precisely the
+"reproducibility" risk the brief warns about, and it happened to me within
+minutes of running the notebook for real.
+
+`requirements.txt` had `datasets>=2.19` — a floor, no ceiling. Kaggle's
+environment installed the latest release, which turned out to be a 4.x version.
+Hugging Face removed support for legacy "loading script" dataset repos entirely
+in `datasets` 4.0.0, and `pierreguillou/DocLayNet-base` is exactly that kind of
+repo. Result:
+
+```
+RuntimeError: Dataset scripts are no longer supported, but found DocLayNet-base.py
+```
+
+Nothing about my conversion logic was wrong. The tool I was calling into had
+changed its supported input format between when I tested locally and when
+Kaggle resolved the package.
+
+**Fix:** pinned `datasets>=2.19,<4.0.0` in `requirements.txt` and in the
+notebook's install cell, and wrapped the `load_dataset` call in
+`prepare_dataset.py` to catch this specific `RuntimeError` and explain what
+happened and how to fix it, rather than let whoever hits it next (possibly a
+reviewer trying to reproduce my run six weeks from now) decode a bare stack
+trace from inside the `datasets` internals.
+
+The honest lesson: an unpinned floor-only dependency is a real reproducibility
+gap, not a theoretical one. It cost me a run failure inside the first few
+minutes of using the one GPU session I had.

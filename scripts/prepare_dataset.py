@@ -305,7 +305,30 @@ def main() -> None:
     from datasets import load_dataset
 
     print(f"Loading {HF_DATASET} (3.8 GB on first run, cached after)...", flush=True)
-    dataset = load_dataset(HF_DATASET)
+    try:
+        dataset = load_dataset(HF_DATASET)
+    except RuntimeError as error:
+        """
+        This is the one dependency failure I actually hit while building this,
+        so I am catching it by name rather than leaving the next person (which
+        might be me, or a reviewer reproducing the run) to decode a stack trace.
+
+        pierreguillou/DocLayNet-base ships as a legacy "loading script" dataset
+        repo, and Hugging Face's `datasets` library removed loading-script
+        support outright in 4.0.0. requirements.txt pins `datasets<4.0.0` for
+        exactly this reason, but if someone's environment already has a newer
+        version cached, this is what they hit.
+        """
+        if "no longer supported" in str(error):
+            raise RuntimeError(
+                f"{error}\n\n"
+                "This dataset repo uses the old Hugging Face 'loading script' "
+                "format, which datasets>=4.0.0 removed support for entirely. "
+                "Fix: pip install \"datasets<4.0.0\" (already pinned in "
+                "requirements.txt - your environment likely has a newer "
+                "version cached from something else)."
+            ) from error
+        raise
 
     if args.verify:
         _render_label_check(dataset, out_dir, args.verify)
