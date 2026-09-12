@@ -325,3 +325,71 @@ of me hand-writing it, so the class names in the training config physically
 cannot drift from `app/constants.py`. That is the same drift bug I consolidated
 the class list to avoid, and hand-writing the YAML would have reintroduced it
 through the back door.
+
+---
+
+## Training setup — the augmentation defaults were wrong for me
+
+Most of the training script is unremarkable: RT-DETR-L fine-tuned from COCO
+weights, AdamW, cosine schedule, 30 epochs, batch 8 at 640px on the T4. Two
+parts are worth explaining because they are decisions rather than defaults.
+
+### Three augmentations I had to turn off
+
+Ultralytics ships sensible augmentation defaults — sensible for photographs.
+I went through them asking what each transform physically means when the image
+is a document page, and three of them are actively harmful:
+
+**`fliplr` defaults to 0.5.** That mirrors half of my training images. For
+street scenes this is free data, because a car facing left is as valid as one
+facing right. A document is not symmetric: text runs left to right, page numbers
+sit in particular corners, indentation means something. A mirrored page is a
+layout that cannot physically exist, and leaving this on means spending half my
+training signal teaching the model that it can. Set to 0.
+
+**`flipud`** — the same argument, just more obvious. An upside-down page.
+
+**`mosaic` defaults on**, compositing four training images into one. For object
+detection in natural scenes this is a genuinely clever trick for varying scale
+and context. For documents it produces a collage of four quarter-pages, which is
+not a document, and it specifically destroys whole-page spatial structure —
+header at the top, footer at the bottom — which is exactly the prior I want the
+model to learn. Off.
+
+None of these would have thrown an error. I would simply have got a worse model
+and had no idea which of a dozen things was responsible.
+
+What I kept is small-angle rotation (3°) and mild perspective. Those map to real
+things that happen to real documents — a page fed slightly crooked through a
+scanner, or photographed at a slight angle. This is also my only hedge against
+the hidden evaluation set containing camera-captured pages, which is the main
+risk I knowingly took when I chose this domain.
+
+### Learning rate
+
+1e-4, not the 1e-2 that YOLO-style configs use. DETR-family models have
+transformer components that are unstable at high learning rates, and I am
+fine-tuning from COCO weights rather than training from scratch, so I want to
+move the existing weights gently rather than blow them away in the first epoch.
+
+### What starting from COCO weights actually buys me
+
+Worth being precise about, because it interacts with the non-COCO requirement.
+None of my eleven classes exist in COCO, so the detection head is effectively
+relearned from nothing — I inherit zero class knowledge. What the pretrained
+backbone gives me is generic visual features: edges, texture, the notion of a
+coherent region. On 6,910 training images in one day, training a transformer
+detector from random initialisation would not converge to anything useful, so
+this is the difference between having a model and not having one.
+
+### Resolution, and the compromise I am making
+
+I am training at 640px on 1025px source pages. I would rather have used 800 or
+1024, because thin classes — `Footnote`, `Page-footer` — lose a lot of detail
+when the page is squeezed down that far, and I expect that to show up directly
+in their per-class AP.
+
+I am doing it anyway because the time budget forces it, and I would rather
+report the limitation honestly than run out of session. I am noting the
+prediction here, before training, so that when those classes come out worst I
+can point at this paragraph rather than claim after the fact that I expected it.
