@@ -751,3 +751,43 @@ font, drew a real string, and measured the rendered text's bounding-box
 height in code (21px at size 28, versus the ~8-10px the bitmap default would
 produce), rather than just assuming a `try/except ImageFont.truetype` block
 did what I intended.
+
+---
+
+## Seventh snag — training crashed after a perfectly good epoch 1
+
+Epoch 1 actually finished cleanly - losses came down to sane values
+(giou 0.699, cls 1.393, l1 0.332) and validation ran and printed a real
+mAP50 of 0.0444, which is exactly what a first epoch on a from-scratch head
+should look like. Then the run died immediately after, inside Ultralytics'
+own callback system:
+
+```
+File ".../ultralytics/utils/callbacks/raytune.py", line 17, in on_fit_epoch_end
+    if ray.train._internal.session._get_session():
+AttributeError: module 'ray.train._internal.session' has no attribute
+'_get_session'
+```
+
+I pulled the actual installed source of that callback module rather than
+guessing. Ultralytics auto-registers a Ray Tune progress-reporting callback
+whenever the `ray` package is merely *importable* in the environment - it
+does not check whether a Ray Tune sweep is actually running. Kaggle's base
+image ships `ray` pre-installed for something unrelated to this project, so
+the callback silently activated on a completely ordinary training run and
+then called an internal Ray API that the installed ray version had renamed
+or removed.
+
+This has nothing to do with my model, my data, or my hyperparameters - it is
+two unrelated libraries colliding in an environment I do not control. The
+official switch is Ultralytics' own settings flag: `SETTINGS["raytune"] =
+False`, which trips the module's own `assert SETTINGS["raytune"] is True`
+check before it ever imports ray, so the broken callback never registers at
+all. Added to train.py right before the training call, since that is when
+the callback registry reads the setting.
+
+Seven real infrastructure snags now, every one of them in an environment I do
+not fully control and none of them a mistake in my actual detection or
+reasoning logic. I am glad this log exists - a memo written after the fact
+would have no way to show that the delays were dependency archaeology, not
+confusion about the model.

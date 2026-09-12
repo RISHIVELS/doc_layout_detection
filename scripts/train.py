@@ -180,6 +180,28 @@ def main() -> None:
         args.name = "smoke"
 
     from ultralytics import RTDETR
+    from ultralytics.utils import SETTINGS
+
+    """
+    Ultralytics auto-registers a Ray Tune progress callback the moment `ray`
+    is importable in the environment at all - it does not check whether I am
+    actually running a Ray Tune sweep, only whether the package is present.
+    Kaggle's base image ships `ray` pre-installed for unrelated tooling, so
+    the callback silently activates on a plain, non-Tune training run and
+    then crashes at the end of the first epoch calling an internal Ray API
+    (`ray.train._internal.session._get_session`) that does not exist in the
+    installed ray version:
+
+        AttributeError: module 'ray.train._internal.session' has no
+        attribute '_get_session'
+
+    I am not using Ray Tune anywhere in this project, so I disable the
+    integration outright via Ultralytics' own settings flag rather than
+    fighting the environment's ray installation. This has to run before
+    model.train() is called, since that is when the callback registry reads
+    this setting and decides whether to import ray at all.
+    """
+    SETTINGS["raytune"] = False
 
     """
     Starting from COCO-pretrained weights rather than scratch.
