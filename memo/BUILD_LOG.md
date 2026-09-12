@@ -558,3 +558,43 @@ needs a different view of the same detections gets it from the same place.
 
 Small fix, but it is the kind of thing I would rather catch by asking "why
 isn't this data already here" than by accumulating parameters.
+
+---
+
+## The router's real job: telling content questions from layout questions
+
+The prefilter half of the router was quick - a handful of regexes for
+greetings and general-knowledge questions that obviously have nothing to do
+with an uploaded image. The part I spent real thought on was the system
+prompt for the LLM half, because this is where the "insufficient information"
+story either becomes real or becomes theatre.
+
+The trap I was avoiding: a question like "what is the invoice total?" mentions
+the document, sounds like it needs the detector, and a lazily-written router
+would happily set needs_detection=true and send it through - at which point
+the detector returns a Table box, the evidence builder counts it, and the
+synthesis step is left trying to answer a content question from a location.
+That is exactly the kind of confident-sounding wrong answer I built this whole
+layer to avoid.
+
+So the system prompt says explicitly: the detector's entire vocabulary is the
+eleven DocLayNet classes, it knows WHERE things are and never WHAT they say,
+and any question about text content - amounts, names, dates, who signed
+something - is out_of_scope even though it mentions the document. That
+sentence is doing the real work. Without it, the model has no way to know
+that "invoice total" is outside what a layout detector can ever answer, no
+matter how confident the detection.
+
+I used Groq's strict json_schema mode for this call rather than prompting for
+JSON and parsing it myself. With strict mode the output is constrained during
+decoding, so a malformed response simply cannot happen - I do not need retry
+logic for "the model returned prose instead of JSON", which is the usual
+failure mode for this kind of call. I still validate the parsed values make
+sense in code, because well-formed and sensible are different guarantees.
+
+One more decision worth recording: on any LLM failure - bad key, timeout,
+Groq being down - route() fails closed to out_of_scope rather than guessing.
+I thought about the alternative (fail open, assume detection is needed) and
+decided it is the wrong default: skipping a real, answerable question is a
+worse failure than declining one that could have been answered, because the
+second failure mode still tells the user something true.
