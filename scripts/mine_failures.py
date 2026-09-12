@@ -34,6 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.constants import ID_TO_CLASS  # noqa: E402
+from scripts._render_utils import load_label_font as _label_font  # noqa: E402
 
 PALETTE = [
     "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4",
@@ -133,33 +134,44 @@ def score_page(
     }
 
 
+
+def _draw_labelled_box(draw, colour: str, x1, y1, x2, y2, label: str, font) -> None:
+    """Box outline plus a solid-background label, legible over any page content."""
+    draw.rectangle([x1, y1, x2, y2], outline=colour, width=4)
+    text_box = draw.textbbox((x1, y1), label, font=font)
+    draw.rectangle(
+        [text_box[0] - 2, text_box[1] - 2, text_box[2] + 2, text_box[3] + 2],
+        fill=colour,
+    )
+    draw.text((x1, y1), label, font=font, fill="white")
+
+
 def _render_comparison(image, ground_truth, predictions, out_path: Path) -> None:
     """Draws ground truth on the left and the prediction on the right."""
     from PIL import Image, ImageDraw
 
     width, height = image.size
-    canvas = Image.new("RGB", (width * 2 + 20, height + 30), "white")
-    canvas.paste(image, (0, 30))
-    canvas.paste(image, (width + 20, 30))
+    canvas = Image.new("RGB", (width * 2 + 20, height + 40), "white")
+    canvas.paste(image, (0, 40))
+    canvas.paste(image, (width + 20, 40))
 
     draw = ImageDraw.Draw(canvas)
-    draw.text((10, 10), "GROUND TRUTH", fill="black")
-    draw.text((width + 30, 10), "PREDICTION", fill="black")
+    header_font = _label_font(24)
+    label_font = _label_font(22)
+    draw.text((10, 8), "GROUND TRUTH", font=header_font, fill="black")
+    draw.text((width + 30, 8), "PREDICTION", font=header_font, fill="black")
 
     for class_id, (x1, y1, x2, y2) in ground_truth:
         colour = PALETTE[class_id % len(PALETTE)]
-        draw.rectangle([x1, y1 + 30, x2, y2 + 30], outline=colour, width=3)
-        draw.text((x1 + 4, y1 + 34), ID_TO_CLASS.get(class_id, "?"), fill=colour)
+        _draw_labelled_box(draw, colour, x1, y1 + 40, x2, y2 + 40,
+                            ID_TO_CLASS.get(class_id, "?"), label_font)
 
     offset = width + 20
     for class_id, (x1, y1, x2, y2), confidence in predictions:
         colour = PALETTE[class_id % len(PALETTE)]
-        draw.rectangle([x1 + offset, y1 + 30, x2 + offset, y2 + 30], outline=colour, width=3)
-        draw.text(
-            (x1 + offset + 4, y1 + 34),
-            f"{ID_TO_CLASS.get(class_id, '?')} {confidence:.2f}",
-            fill=colour,
-        )
+        label = f"{ID_TO_CLASS.get(class_id, '?')} {confidence:.2f}"
+        _draw_labelled_box(draw, colour, x1 + offset, y1 + 40, x2 + offset, y2 + 40,
+                            label, label_font)
 
     canvas.save(out_path)
 

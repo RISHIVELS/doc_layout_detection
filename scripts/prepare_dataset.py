@@ -255,6 +255,10 @@ def _render_label_check(dataset, out_dir: Path, sample_size: int) -> None:
     """
     from PIL import ImageDraw
 
+    from scripts._render_utils import load_label_font
+
+    label_font = load_label_font(28)
+
     # Writing straight into out_dir rather than climbing to its parent, same
     # as prep_report.json and doclaynet.yaml below. My first version reached
     # up to out_dir.parent, which put this somewhere I then pointed the
@@ -281,8 +285,22 @@ def _render_label_check(dataset, out_dir: Path, sample_size: int) -> None:
         for bbox, category in dedupe_annotations(row["bboxes_block"], row["categories"]):
             x, y, w, h = bbox
             colour = palette[category % len(palette)]
-            draw.rectangle([x, y, x + w, y + h], outline=colour, width=3)
-            draw.text((x + 4, y + 4), ID_TO_CLASS.get(category, "?"), fill=colour)
+            label = ID_TO_CLASS.get(category, "?")
+            draw.rectangle([x, y, x + w, y + h], outline=colour, width=4)
+
+            """
+            Plain coloured text sitting directly on a document page is
+            unreadable half the time - the page is mostly white, but a label
+            landing on dark scanned text or another box's fill is invisible.
+            I draw a solid rectangle behind the label first, sized to the
+            actual text, so it reads the same regardless of what is under it.
+            """
+            text_box = draw.textbbox((x, y), label, font=label_font)
+            draw.rectangle(
+                [text_box[0] - 2, text_box[1] - 2, text_box[2] + 2, text_box[3] + 2],
+                fill=colour,
+            )
+            draw.text((x, y), label, font=label_font, fill="white")
 
         image.save(check_dir / f"check_{index:06d}.png")
 

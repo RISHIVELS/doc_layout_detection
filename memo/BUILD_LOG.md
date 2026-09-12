@@ -711,3 +711,43 @@ modelling mistake, and every one of them was invisible until I actually ran
 the thing on real infrastructure with a fresh checkout. That is exactly why
 this log exists - a memo written after a single clean run would have no idea
 any of this happened.
+
+---
+
+## Sixth snag — the labels I built the whole gate around were unreadable
+
+Once the path bug was fixed, the label-check images finally showed up - and
+the class-name labels drawn on each box were completely illegible. I had
+used PIL's default font (`ImageDraw.text` with no font argument), which
+renders at roughly 10px. On a 1025px page that is already small; resized for
+a notebook display or a screenshot, as these images only ever are, it
+becomes an unreadable smear of colour.
+
+This is not a cosmetic bug. The entire reason `--verify` exists is that I
+cannot trust the class-index ordering from the dataset card alone, and the
+only way to actually check it is reading the label text next to a box and
+confirming it says what the region actually is. A label-check step whose
+labels cannot be read is not a check at all - it was passing images through
+without verifying anything, which is the exact failure mode it was built to
+prevent.
+
+Fixed with three changes: a real scalable font at 28pt instead of the bitmap
+default, a solid coloured background block behind each label so it stays
+legible regardless of what page content sits underneath it, and thicker box
+outlines. For the font itself I did not want to gamble on a bare
+`"DejaVuSans-Bold.ttf"` resolving on whatever machine runs this - that only
+works if the OS's own font search happens to find it. `matplotlib` is
+already a pinned dependency, and it ships its own copy of exactly that font
+inside its package data, so I load from there first (guaranteed present
+wherever `pandas`/`matplotlib` can already be imported), then a couple of
+common system paths, then the tiny default only as a last resort. I pulled
+this into `scripts/_render_utils.py` since `mine_failures.py` draws labels
+onto the failure-case renders with the identical requirement - those
+renders are the actual evidence behind the memo's five failure cases, so
+legible labels matter there for exactly the same reason.
+
+I verified this properly rather than trusting it by inspection: loaded the
+font, drew a real string, and measured the rendered text's bounding-box
+height in code (21px at size 28, versus the ~8-10px the bitmap default would
+produce), rather than just assuming a `try/except ImageFont.truetype` block
+did what I intended.
