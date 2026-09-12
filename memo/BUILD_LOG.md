@@ -531,3 +531,30 @@ a stable parent directory first. Small, but it is the difference between the
 clone cell being safely re-runnable and it corrupting the session on the second
 run - and I am re-running it after almost every fix in this log, so it needed
 to be safe to repeat.
+
+---
+
+## A design smell I caught mid-task: guardrail's awkward extra parameter
+
+While wiring the guardrail's ambiguous-band rule, I hit a case where the rule
+needs the raw list of confidence scores, not just the max/mean/min that
+`Evidence` carried at the time. My first instinct was to add an optional
+`raw_confidences` parameter to `evaluate_guardrail()` and have the caller pass
+it in separately.
+
+I stopped before writing tests against that version, because it was solving
+the wrong problem. The actual gap was that `Evidence` - the one object whose
+entire job is to be the complete structured summary a downstream function
+reasons from - was missing data a downstream function needed. Bolting a
+parallel argument onto every caller is the fix you reach for when you do not
+want to touch the thing that is actually incomplete.
+
+Added `confidences_by_class: dict[str, list[float]]` to `Evidence` itself
+(the raw values were already being computed inside `build_evidence()`, just
+discarded after computing the summary stats) and had the guardrail read them
+off `evidence` like everything else it needs. `evaluate_guardrail()` now has
+exactly one input to reason about instead of two, and any future rule that
+needs a different view of the same detections gets it from the same place.
+
+Small fix, but it is the kind of thing I would rather catch by asking "why
+isn't this data already here" than by accumulating parameters.

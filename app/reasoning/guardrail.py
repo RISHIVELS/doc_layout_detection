@@ -70,17 +70,23 @@ def evaluate_guardrail(
     target_classes: list[str],
     task_type: str,
     saturated: bool = False,
-    raw_confidences: list[float] | None = None,
 ) -> GuardrailVerdict:
     """
     Checks the evidence against the four honesty rules, most specific first.
 
-    `raw_confidences` is optional and only needed for the ambiguous-band rule,
-    which has to look at the actual distribution of scores rather than the
-    summary stats in `Evidence`. I made it optional rather than mandatory
-    because most callers (and most of these tests) only care about the
-    simpler rules, and computing it is the pipeline's job, not every test's.
+    Everything this function needs - including the raw per-detection
+    confidence scores the ambiguous-band rule looks at - comes off `evidence`
+    itself. My first draft took a separate `raw_confidences` argument because
+    I had only put summary stats on Evidence and reached for the quickest fix
+    instead of asking why the data I needed wasn't already there. Adding the
+    raw scores to Evidence and reading them here is the same amount of code
+    and means this function has exactly one input to reason about.
     """
+    raw_confidences = [
+        value
+        for class_name in target_classes
+        for value in evidence.confidences_by_class.get(class_name, [])
+    ]
     target_counts = {
         class_name: evidence.class_counts.get(class_name, 0)
         for class_name in target_classes

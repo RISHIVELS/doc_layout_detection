@@ -44,6 +44,11 @@ class Evidence:
     total_detections: int
     reading_order: list[str]
     relations: list[Relation] = field(default_factory=list)
+    # Raw per-detection confidence scores, kept alongside the summary stats
+    # above. I need these in the guardrail for the ambiguous-band rule, which
+    # asks "what fraction of the scores sit in a shaky range" - a question
+    # max/mean/min cannot answer on their own.
+    confidences_by_class: dict[str, list[float]] = field(default_factory=dict)
 
 
 def _box_area(detection: Detection) -> float:
@@ -136,4 +141,5 @@ def build_evidence(detections: list[Detection], image_width: int, image_height: 
         total_detections=len(detections),
         reading_order=reading_order,
         relations=relations,
+        confidences_by_class=confidences_by_class,
     )
