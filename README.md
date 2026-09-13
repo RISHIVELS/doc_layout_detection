@@ -279,15 +279,25 @@ reasoning trace.
 
 ### Deploying to Hugging Face Spaces
 
+A dedicated branch keeps the Space's README (which needs special
+frontmatter) separate from this repo's own README:
+
 ```bash
-git remote add space https://huggingface.co/spaces/<your-username>/<space-name>
-cp deploy/huggingface_space_README.md README.md   # only in the Space's copy
+git checkout -b hf-space
+cp deploy/huggingface_space_README.md README.md
 git add README.md && git commit -m "space config"
-git push space main
+
+git remote add space https://huggingface.co/spaces/<your-username>/<space-name>
+git push space hf-space:main
+
+git checkout main   # back to normal - hf-space branch is kept for later updates
 ```
 
-Add `GROQ_API_KEY` as a Space secret. Weights need to be pushed separately
-via git-lfs (`git lfs track "*.pt"`) since they're too large for a normal push.
+In the Space's **Settings → Repository secrets**, add:
+- `GROQ_API_KEY`
+- `MODEL_URL` — set to the [weights download link](https://github.com/RISHIVELS/doc_layout_detection/releases/download/weights-v1/best.pt)
+  above. The app downloads it automatically on first run — no need to push
+  the 66 MB weights file into the Space's own git repo.
 
 ## Docker
 

@@ -20,4 +20,7 @@ code with: see the main repo.
 ## Space secrets needed
 
 - `GROQ_API_KEY` - for the Ask tab's reasoning layer
-- `MODEL_PATH` - only if the weights aren't at the default `./weights/best.pt`
+- `MODEL_URL` - direct download link for the trained weights (e.g. a
+  GitHub Release asset). Downloaded automatically on first run if
+  `MODEL_PATH` doesn't already exist - no need to push the weights file
+  into the Space's git repo.
