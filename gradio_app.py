@@ -40,6 +40,20 @@ PALETTE = [
 _detector: Detector | None = None
 
 
+@_gpu_decorator
+def _predict_on_gpu(predict_fn, image, conf: float = 0.25):
+    # Has to be a real, literally-decorated top-level function - ZeroGPU
+    # scans the source at startup for an @spaces.GPU function and doesn't
+    # see decoration applied dynamically at runtime (which is what my
+    # first attempt did, wrapping detector.predict inside get_detector()).
+    #
+    # Takes the original predict method as a plain argument rather than
+    # the Detector instance - calling detector.predict(...) here would
+    # infinitely recurse, since get_detector() below reassigns that exact
+    # attribute to a lambda that calls back into this function.
+    return predict_fn(image, conf=conf)
+
+
 def get_detector() -> Detector:
     # module-level singleton, same reasoning as main.py's get_detector -
     # loads once per process, not per request
@@ -51,10 +65,12 @@ def get_detector() -> Detector:
         except FileNotFoundError:
             pass  # surfaced in the UI instead of crashing the app
         else:
-            # wrap predict() so every call (from run_detect directly, or
-            # from inside the reasoning pipeline) requests the shared
-            # ZeroGPU allocation for its duration - not the whole process
-            _detector.predict = _gpu_decorator(_detector.predict)
+            # capture the real bound method before overwriting the
+            # attribute - route every predict() call (from run_detect
+            # directly, or from inside the reasoning pipeline) through
+            # the properly decorated function above
+            original_predict = _detector.predict
+            _detector.predict = lambda image, conf=0.25: _predict_on_gpu(original_predict, image, conf)
     return _detector
 
 
