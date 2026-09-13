@@ -791,3 +791,55 @@ not fully control and none of them a mistake in my actual detection or
 reasoning logic. I am glad this log exists - a memo written after the fact
 would have no way to show that the delays were dependency archaeology, not
 confusion about the model.
+
+---
+
+## Building the FastAPI app while training runs
+
+Built this entirely offline from the GPU - none of it needs a trained model,
+just the schemas and detector interface from earlier. Kept it deliberately
+thin: upload validation, error mapping, logging, then a straight handoff to
+Detector or the reasoning pipeline, both of which already have their own
+tests. If I ever need to check "is the model good", the answer is in
+evaluate.py, never in this file.
+
+**A real bug I caught before it shipped:** my first draft wrote
+`detector: Detector = get_detector()` as the dependency default - calling
+the function immediately at import time instead of wrapping it in FastAPI's
+`Depends()`. That is a genuine, easy-to-miss mistake: the app would have
+started and worked fine in normal use, because `get_detector()` still
+returns a valid Detector either way. It would only have broken silently the
+moment a test tried `app.dependency_overrides[get_detector] = stub` - the
+override dict would be set, but the route would already be holding a
+concrete instance resolved at import time, so the stub would never actually
+be used. My own tests caught it immediately (dependency injection literally
+does not run), which is exactly the case for writing the tests before
+declaring the endpoint done rather than eyeballing the code and moving on.
+
+**Model loading**: tries once at startup via a lifespan handler, but does not
+crash the app if the weights are missing - it logs the failure and lets
+/health report `model_loaded: false` instead. I want a bad MODEL_PATH to be
+something the API tells you about, not something that prevents the API from
+starting at all, since the second failure mode is much harder to debug from
+outside the container.
+
+**Error mapping, deliberately specific rather than one generic catch-all:**
+- 413 for an oversized upload, checked before anything else is validated
+- 415 for a wrong content-type, and separately for a file that claims to be
+  an image but fails to actually decode as one - I did not want to trust the
+  header alone
+- 503 when the model is not loaded - a known, expected operational state,
+  not a bug, so it gets its own code rather than looking like a crash
+- Everything else genuinely unexpected goes through one global exception
+  handler that logs the real error server-side in full but returns a plain,
+  safe message to the caller - no internal exception text or stack trace
+  leaves the process
+
+**One TestClient quirk worth remembering**: by default it re-raises an
+unhandled exception straight into the test rather than returning the error
+response the app itself would produce, specifically so ordinary bugs surface
+loudly during testing. That is the right default in general, but it is
+backwards for the one test whose entire point is checking what a caller
+receives when the global handler catches something - needed
+`raise_server_exceptions=False` on that fixture to actually get a response
+object to assert on instead of a raised exception.
