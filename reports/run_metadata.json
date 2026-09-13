@@ -1,5 +1,6 @@
 {
   "git_commit": "00ed77c89f8b469e5dfa32b96cbf9f8e1d79d332",
+  "git_commit_note": "This hash was recorded by train.py at training time and will NOT resolve in the current repo: history was rewritten twice afterwards (once to purge a leaked API key from an early commit, once to strip commit trailers). The training code itself is unchanged - scripts/train.py and scripts/prepare_dataset.py carry the same content, under new hashes. Flagging rather than substituting a current hash, which would misstate which commit actually produced these weights.",
   "hyperparameters": {
     "data": "/kaggle/working/data/doclaynet/doclaynet.yaml",
     "epochs": 15,
