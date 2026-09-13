@@ -843,3 +843,44 @@ backwards for the one test whose entire point is checking what a caller
 receives when the global handler catches something - needed
 `raise_server_exceptions=False` on that fixture to actually get a response
 object to assert on instead of a raised exception.
+
+---
+
+## Docker: built and actually run, not just written
+
+I did not want to write a Dockerfile and call it done without ever building
+it - that is exactly the kind of unverified claim I have been careful to
+avoid everywhere else in this project, and a Dockerfile with a typo in it is
+indistinguishable from a correct one until someone actually runs `docker
+build`.
+
+Real verification, in order:
+1. `docker build` - succeeded, ~85s cold (mostly torch CPU wheel + the
+   ultralytics/torchvision/pandas dependency chain downloading).
+2. `docker run` with no weights present - the container started cleanly
+   rather than crashing, and `/health` correctly reported
+   `model_loaded: false` with the real error visible in the structured JSON
+   log. This is precisely the startup behaviour I designed in main.py's
+   lifespan handler: a missing checkpoint should be something the API can
+   tell you about, not something that prevents it from starting at all.
+3. `/detect` against the model-less container returned `503` with a clear
+   message, not a crash.
+4. `/ask` with a missing `question` field returned FastAPI's standard `422`
+   validation error.
+5. An unknown route returned a plain `404`, confirming the global exception
+   handler is not swallowing routing errors it should not be involved in.
+6. Docker's own `HEALTHCHECK` reported `healthy` once the app was up.
+
+I could not exercise the 415/413 upload-validation paths against the live
+container in this pass, since testing those meaningfully wants a loaded
+model (to distinguish "rejected before inference" from "no model to run
+it through" - both currently short-circuit to a response before ever
+reaching the detector). Those two paths are already covered by
+tests/test_api.py against a stub detector with `is_loaded=True`, so they are
+tested, just not additionally hand-verified against this particular
+container run.
+
+CPU-only torch wheel deliberately, not the default PyPI package - the
+default pulls the full CUDA toolkit (multiple GB) into an image that only
+ever needs to run a forward pass on a CPU host. Non-root user, since there
+is no functional reason for this process to run as root.

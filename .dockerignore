@@ -1,0 +1,17 @@
+# Keeps the build context small and the image free of anything that
+# shouldn't be baked in - datasets, checkpoints, and secrets especially.
+.git/
+.pytest_cache/
+__pycache__/
+*.pyc
+.env
+data/
+runs/
+reports/
+notebooks/
+docs/
+tests/
+memo/
+*.ipynb
+.venv/
+venv/
