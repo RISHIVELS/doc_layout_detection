@@ -417,7 +417,7 @@ def test_prefilter_defers_ambiguous_questions_to_the_llm():
 - Create: `Dockerfile`, `.dockerignore`, `README.md`, `memo/MEMO.md`
 
 - [ ] **Step 1: Write the `Dockerfile`** — `python:3.11-slim`, CPU torch wheel, non-root user, `HEALTHCHECK` hitting `/health`, `uvicorn` entrypoint.
-- [ ] **Step 2: Build and run it** — `docker build -t rap-doclayout . && docker run -p 8000:8000 -e OPENAI_API_KEY=... rap-doclayout`, then curl both endpoints. **Paste the real responses into the README — do not invent sample payloads.**
+- [ ] **Step 2: Build and run it** — `docker build -t doc_layout_detection . && docker run -p 8000:8000 -e OPENAI_API_KEY=... doc_layout_detection`, then curl both endpoints. **Paste the real responses into the README — do not invent sample payloads.**
 - [ ] **Step 3: Write `README.md`** — setup, exact reproduction commands, hardware used, training time, hyperparameters, weights download path, and verified `curl` examples with real request/response payloads for both endpoints.
 - [ ] **Step 4: Write `memo/MEMO.md`, max 2 pages**, covering all five required items from the brief. Source its content from the spec, `reports/metrics.json`, and `reports/failures/`.
 - [ ] **Step 5: Dependency audit** — `grep -riE "langchain|langgraph|crewai|autogen" .` must return nothing outside documentation prose. Record the result.
