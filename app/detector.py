@@ -25,16 +25,28 @@ class Detector:
     def load(self) -> None:
         """Lazy load - keeps a bad MODEL_PATH from crashing the whole app
         at startup. Checks the file exists first so the error is readable
-        instead of a torch.load stack trace."""
+        instead of a torch.load stack trace.
+
+        If the weights aren't on disk but MODEL_URL is set, downloads them
+        first - this is what lets a fresh HF Space or Docker container just
+        work without manually copying a 66MB file into every host."""
         if self.is_loaded:
             return
 
-        if not Path(self._weights_path).exists():
-            raise FileNotFoundError(
-                f"Model weights not found at '{self._weights_path}'. "
-                "Set MODEL_PATH in your .env, or see the README for the "
-                "weights download link."
-            )
+        path = Path(self._weights_path)
+        if not path.exists():
+            model_url = os.environ.get("MODEL_URL")
+            if model_url:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                import urllib.request
+
+                urllib.request.urlretrieve(model_url, path)
+            else:
+                raise FileNotFoundError(
+                    f"Model weights not found at '{self._weights_path}'. "
+                    "Set MODEL_PATH to an existing file, or set MODEL_URL to "
+                    "download from - see the README for the weights link."
+                )
 
         from ultralytics import RTDETR
 
