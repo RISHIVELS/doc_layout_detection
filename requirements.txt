@@ -16,6 +16,9 @@ pillow>=10.0
 numpy>=1.26
 tqdm>=4.66
 
+# --- Streamlit demo UI (for Hugging Face Spaces) ---
+streamlit>=1.38
+
 # --- API ---
 fastapi>=0.115
 uvicorn[standard]>=0.30
