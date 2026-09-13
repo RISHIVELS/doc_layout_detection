@@ -5,6 +5,10 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()  # loads .env locally, no-op on HF Spaces (uses Space secrets instead)
+
 import streamlit as st
 from PIL import Image, ImageDraw
 

@@ -1,0 +1,70 @@
+{
+  "weights": "runs/detect/rtdetr_doclaynet/weights/best.pt",
+  "overall": {
+    "mAP50": 0.6216,
+    "mAP50_95": 0.4122,
+    "precision": 0.7056,
+    "recall": 0.6052
+  },
+  "per_class_mAP50_95": {
+    "Caption": 0.4112,
+    "Footnote": 0.0963,
+    "Formula": 0.4119,
+    "List-item": 0.4518,
+    "Page-footer": 0.4962,
+    "Page-header": 0.3857,
+    "Picture": 0.38,
+    "Section-header": 0.4851,
+    "Table": 0.6333,
+    "Text": 0.6579,
+    "Title": 0.1246
+  },
+  "query_saturation": {
+    "measured": true,
+    "query_budget": 300,
+    "max_regions_on_any_page": 95,
+    "mean_regions_per_page": 12.7,
+    "pages_over_budget": 0,
+    "percent_over_budget": 0.0
+  },
+  "split_leakage": {
+    "measured": true,
+    "shared_source_pdfs": 0,
+    "test_pages_from_shared_pdfs": 0,
+    "test_pages_total": 499,
+    "percent_affected": 0.0
+  },
+  "confusion_matrix_plot": "runs/detect/val/confusion_matrix_normalized.png",
+  "per_doc_category": {
+    "financial_reports": {
+      "pages": 172,
+      "mAP50": 0.5349,
+      "mAP50_95": 0.3383
+    },
+    "government_tenders": {
+      "pages": 29,
+      "mAP50": 0.547,
+      "mAP50_95": 0.4103
+    },
+    "laws_and_regulations": {
+      "pages": 86,
+      "mAP50": 0.4949,
+      "mAP50_95": 0.316
+    },
+    "manuals": {
+      "pages": 77,
+      "mAP50": 0.6327,
+      "mAP50_95": 0.4321
+    },
+    "patents": {
+      "pages": 32,
+      "mAP50": 0.7427,
+      "mAP50_95": 0.5509
+    },
+    "scientific_articles": {
+      "pages": 103,
+      "mAP50": 0.7451,
+      "mAP50_95": 0.5254
+    }
+  }
+}

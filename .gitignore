@@ -5,6 +5,7 @@ runs/
 *.pt
 *.pth
 reports/failures/
+reports/category_splits/
 
 # Secrets
 .env

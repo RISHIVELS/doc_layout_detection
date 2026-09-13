@@ -6,6 +6,12 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 
+# loads .env if one exists (local dev) - does nothing if it doesn't (Docker,
+# HF Spaces, Kaggle all set real env vars/secrets instead)
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image, UnidentifiedImageError

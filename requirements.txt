@@ -20,6 +20,7 @@ tqdm>=4.66
 streamlit>=1.38
 
 # --- API ---
+python-dotenv>=1.0
 fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic>=2.7
