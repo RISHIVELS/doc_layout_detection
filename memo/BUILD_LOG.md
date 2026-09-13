@@ -154,3 +154,33 @@ Live-tested the full pipeline against the trained weights on a real,
 previously-unseen page: asking a content question ("what law is this
 about") correctly routed to `out_of_scope` before detection ever ran —
 the real example used in the memo.
+
+## Deploying to Hugging Face Spaces
+
+HF's current Space creation flow only offers Gradio, Docker, or Static as
+SDKs - no standalone Streamlit option anymore, despite `streamlit_app.py`
+already being built and working. Docker requires a paid plan on this
+account. Free-tier Gradio Spaces run on ZeroGPU (a shared, dynamically
+allocated GPU) rather than a plain CPU box - downgrading to CPU also
+needs PRO.
+
+Built `gradio_app.py` as a second front end (same `Detector` and
+reasoning pipeline, no duplicated logic) to fit that constraint. ZeroGPU
+requires the actual GPU call wrapped in `@spaces.GPU`, and two real bugs
+came from getting that wrong:
+
+- The decorator has to be on a literal top-level function - ZeroGPU
+  scans source at startup for one, and doesn't see decoration applied
+  dynamically at runtime.
+- `@spaces.GPU` spawns a separate worker process for the GPU call, and
+  everything crossing that boundary gets pickled. My first attempt
+  monkeypatched `detector.predict` with a closure holding a bound method
+  reference - that either fails to pickle outright or resolves to the
+  wrong thing on the other side. Fixed by redesigning so the only
+  GPU-decorated function takes plain arguments (an image, a float) and
+  reaches the detector through a module-level getter internally, with a
+  small proxy class (not a closure) satisfying the reasoning pipeline's
+  interface for the Ask tab.
+
+Live at huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD, verified
+working for both tabs against the real trained weights.

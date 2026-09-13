@@ -6,6 +6,11 @@ between what it can see and what it can't.
 
 Built for RAP's Pre-Hackathon Screening (Track: CV + Applied ML Engineering).
 
+## 🚀 **[Try it live — huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD](https://huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD)**
+
+No setup needed — upload a document page and see real detections and
+Q&A running against the actual trained model.
+
 > **Model weights (`best.pt`, 66 MB) are not in this repo — too large for
 > git.** **[⬇ Download here](https://github.com/RISHIVELS/doc_layout_detection/releases/download/weights-v1/best.pt)**
 > and place at `weights/best.pt` before running anything below.
@@ -267,17 +272,33 @@ This isn't a tuned confidence threshold — the router recognizes that
 before detection ever runs. `insufficient_information` is set in code from
 the guardrail's verdict, never from the LLM self-reporting confidence.
 
-## Streamlit demo
+## Demo UIs
+
+Two front ends, both wrapping the exact same `Detector` and reasoning
+pipeline as the API — no duplicated logic, just presentation.
+
+**`gradio_app.py`** is what's actually deployed live:
+**[huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD](https://huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD)**.
+HF's current Space creation flow only offers Gradio, Docker, or Static as
+SDKs — no standalone Streamlit option, and Docker requires a paid plan —
+so Gradio is the one that actually runs there. Free-tier Gradio Spaces
+run on ZeroGPU (a shared, dynamically-allocated GPU), which is why the
+detector call is wrapped in `@spaces.GPU` — that's what tells the
+platform to allocate the GPU for that call's duration and release it
+after.
+
+```bash
+python gradio_app.py
+```
+
+**`streamlit_app.py`** is kept for local use or a Docker deployment,
+where SDK choice doesn't matter:
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-Same `Detector` and reasoning pipeline as the API, wrapped in a UI —
-upload a page, see boxes drawn live, or ask a question and see the full
-reasoning trace.
-
-### Deploying to Hugging Face Spaces
+### Deploying your own Space
 
 A dedicated branch keeps the Space's README (which needs special
 frontmatter) separate from this repo's own README:
