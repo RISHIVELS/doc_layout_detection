@@ -3,9 +3,8 @@ title: Document Layout Detection
 emoji: 📄
 colorFrom: blue
 colorTo: gray
-sdk: streamlit
-sdk_version: 1.38.0
-app_file: streamlit_app.py
+sdk: gradio
+app_file: gradio_app.py
 pinned: false
 ---
 
