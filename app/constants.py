@@ -1,28 +1,11 @@
-"""
-I keep the class vocabulary in one file because I got bitten by this early on.
-
-My first version had the class list written out separately in the dataset prep
-script, in the training YAML and again in the API response builder. The moment
-those three drifted apart, the labels would still be valid integers, the model
-would still train, and every metric would still look reasonable - it would just
-be quietly learning the wrong thing. There is no error message for that. So the
-list lives here and everything else imports it.
-
-A note on the ordering, because it matters: this is DocLayNet's own 0-indexed
-alphabetical ordering. I verified it against rendered pages rather than trusting
-the dataset card (see scripts/prepare_dataset.py --verify). Do not reorder it.
-The integer ids are written into the YOLO label files on disk and baked into the
-trained weights, so changing the order here silently invalidates both.
-
-The other reason I like this class set: none of these eleven exist in COCO.
-COCO has person, car, dog, chair. It has no concept of a "Section-header" or a
-"Formula". That is what makes the fine-tuning real - there is no pretrained
-checkpoint anywhere that can emit one of these labels, so any mAP I report had
-to be earned.
-"""
-
+# Single source of truth for the class list. Had it duplicated across the
+# dataset script, training yaml and API code early on and they drifted -
+# no error, just silently wrong labels. Everything imports from here now.
 from __future__ import annotations
 
+# DocLayNet's 0-indexed alphabetical order. Verified against rendered pages
+# (see prepare_dataset.py --verify), don't trust the dataset card blindly.
+# Don't reorder - these ids are baked into the label files and the weights.
 CLASS_NAMES: list[str] = [
     "Caption",
     "Footnote",
@@ -44,17 +27,9 @@ NUM_CLASSES: int = len(CLASS_NAMES)
 
 MODEL_VERSION: str = "rtdetr-l-doclaynet-v1"
 
-"""
-DocLayNet pages come from six quite different kinds of document. I carry this
-through dataset prep so that at evaluation time I can break mAP down by
-category instead of only reporting one aggregate number.
-
-I wanted this because a single mAP figure cannot tell me whether the model
-actually learned document structure or just learned what annual reports look
-like - financial reports are the largest slice of the data, so a model that is
-good at those and useless at patents would still post a respectable headline
-score. Splitting the metric out is the only way to catch that.
-"""
+# The 6 doc types DocLayNet covers. Used to break mAP down per category at
+# eval time - one aggregate number can hide a model that's just good at
+# financial reports (the biggest slice) and bad at everything else.
 DOC_CATEGORIES: list[str] = [
     "financial_reports",
     "scientific_articles",
@@ -64,16 +39,7 @@ DOC_CATEGORIES: list[str] = [
     "patents",
 ]
 
-"""
-RT-DETR predicts a fixed number of objects per image - it does not scale with
-how busy the page is. That is a consequence of the DETR design: there are N
-learned object queries and each one produces at most one box.
-
-This is a genuine ceiling for my use case and I only realised it while reading
-the architecture properly. A dense patent page or a financial statement can
-carry a large number of annotated regions, and if a page has more regions than
-the model has queries, the model *cannot* output them all no matter how well it
-was trained. I measure how often this happens on the test set and report it,
-because otherwise it shows up as unexplained recall loss.
-"""
+# RT-DETR has a fixed number of object queries, so it can only ever emit
+# this many boxes per image. Dense pages can exceed it - measured in eval
+# so that shows up as "query saturation", not unexplained recall loss.
 DEFAULT_QUERY_BUDGET: int = 300

@@ -1,43 +1,21 @@
-"""
-Decides whether the evidence is good enough to answer confidently, before the
-LLM ever gets a turn to write anything.
-
-I built this as a separate, pure module rather than folding the check into the
-synthesis prompt because of a specific thing I do not trust: asking a model
-"are you confident enough to answer?" gets you text, and a model asked that
-question is roughly as capable of writing a confident-sounding justification
-for guessing as it is of writing an honest refusal. Both are just tokens it is
-equally fluent at producing.
-
-So the check happens here, in code, before the LLM sees anything, and the
-result is handed to it as a fact rather than a question. Section 5 and 6 of
-the design spec walk through why this is the load-bearing decision in Part B.
-
-The four rules are checked in a fixed order, most specific first, because two
-of them can technically both be true at once and I want the more informative
-explanation to win. "No detections at all" is a more useful thing to tell a
-user than "the page happened to be at its query budget", even on a page where
-both are technically true.
-"""
-
+# Decides if the evidence is good enough to answer confidently - before the
+# LLM writes anything. Kept as a separate deterministic check because asking
+# a model "are you confident?" just gets more text, not a real signal - it's
+# equally fluent at a confident-sounding guess as an honest refusal.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from app.reasoning.evidence import Evidence
 
-# Below this, I do not trust a single detection enough to build an answer on
-# it. I picked 0.50 rather than something more conservative like 0.7 because
-# RT-DETR's confidence scores for correctly localised regions on this dataset
-# cluster well above 0.6 in my own validation runs - 0.50 sits below the
-# "genuinely doing its job" range without being so low that it never fires.
+# Below this, a single detection isn't trustworthy enough to answer from.
+# 0.50 rather than something stricter like 0.7 - correctly localised
+# regions on this dataset tend to score well above 0.6 in my own runs.
 CONFIDENCE_FLOOR = 0.50
 
-# For a counting question specifically, I do not want to report an exact
-# number when a large chunk of the supposed count is sitting in the shaky
-# 0.25-0.50 band. Below 0.25 I already treat as noise the model should not
-# have reported in the first place; between 0.25 and CONFIDENCE_FLOOR is
-# "plausible but not something I'd stake a specific number on".
+# For counting: don't report an exact number if too much of it sits in this
+# shaky band. Below 0.25 is just noise; 0.25-0.50 is "plausible but I
+# wouldn't bet on the count."
 AMBIGUOUS_BAND = (0.25, CONFIDENCE_FLOOR)
 AMBIGUOUS_BAND_FRACTION = 0.30
 
@@ -50,17 +28,12 @@ class GuardrailVerdict:
 
 
 def _confidences_for(evidence: Evidence, target_classes: list[str]) -> list[float]:
-    """Pulls every confidence score belonging to the classes the question is
-    actually about, ignoring detections of unrelated classes on the same page."""
+    """Max confidence per target class, ignoring unrelated classes on the page."""
     values: list[float] = []
     for class_name in target_classes:
         stats = evidence.confidence_stats.get(class_name)
         if stats is None:
             continue
-        # confidence_stats only carries max/mean/min, not the raw list, which
-        # is enough for every rule except the ambiguous-band fraction below.
-        # That rule needs the raw values, so evaluate_guardrail re-derives
-        # them from the caller-supplied per-detection list instead.
         values.append(stats.max)
     return values
 
@@ -71,17 +44,9 @@ def evaluate_guardrail(
     task_type: str,
     saturated: bool = False,
 ) -> GuardrailVerdict:
-    """
-    Checks the evidence against the four honesty rules, most specific first.
-
-    Everything this function needs - including the raw per-detection
-    confidence scores the ambiguous-band rule looks at - comes off `evidence`
-    itself. My first draft took a separate `raw_confidences` argument because
-    I had only put summary stats on Evidence and reached for the quickest fix
-    instead of asking why the data I needed wasn't already there. Adding the
-    raw scores to Evidence and reading them here is the same amount of code
-    and means this function has exactly one input to reason about.
-    """
+    """Four rules, checked in order, most specific first - some can overlap
+    and I want the more useful explanation to win (e.g. "found nothing"
+    beats "page was saturated" even when both are technically true)."""
     raw_confidences = [
         value
         for class_name in target_classes
@@ -93,8 +58,7 @@ def evaluate_guardrail(
     }
     total_target_detections = sum(target_counts.values())
 
-    # Rule 1: nothing of the target class was found at all. This is the most
-    # informative thing to tell the user, so it wins even on a saturated page.
+    # nothing of the target class found at all
     if total_target_detections == 0:
         return GuardrailVerdict(
             triggered=True,
@@ -105,7 +69,7 @@ def evaluate_guardrail(
     max_confidences = _confidences_for(evidence, target_classes)
     observed_max = max(max_confidences) if max_confidences else 0.0
 
-    # Rule 2: something was found, but nothing about it clears the floor.
+    # found something, but nothing clears the confidence floor
     if observed_max < CONFIDENCE_FLOOR:
         return GuardrailVerdict(
             triggered=True,
@@ -113,10 +77,8 @@ def evaluate_guardrail(
             detail={"tau": CONFIDENCE_FLOOR, "observed_max": observed_max},
         )
 
-    # Rule 3: only matters for counting. A presence question ("is there a
-    # Table on this page?") is answered by the single best detection, so a
-    # couple of shaky extra candidates next to a confident one do not make
-    # the answer to "is there one" any less true.
+    # counting only: too much of the count sits in the shaky band.
+    # doesn't apply to "is there one?" - one confident hit is enough for that.
     if task_type == "count" and raw_confidences:
         low, high = AMBIGUOUS_BAND
         in_band = sum(1 for c in raw_confidences if low <= c < high)
@@ -130,10 +92,8 @@ def evaluate_guardrail(
                 },
             )
 
-    # Rule 4: the page had more ground-truth-scale regions than RT-DETR's
-    # fixed query budget could possibly emit. A count off a saturated page is
-    # unreliable for a reason that has nothing to do with confidence - some
-    # regions never got the chance to be detected at any score.
+    # page had more regions than RT-DETR's query budget could emit -
+    # a count here is unreliable regardless of confidence
     if saturated:
         return GuardrailVerdict(triggered=True, rule="query_saturated", detail={})
 

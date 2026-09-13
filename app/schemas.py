@@ -1,17 +1,5 @@
-"""
-Every shape that crosses the API boundary lives here, so /detect and /ask (and
-the tests) are all reading from the same definitions instead of each endpoint
-building its own dict and hoping the field names line up.
-
-I lean on pydantic's validators rather than checking things by hand in the
-route handlers, for a reason that bit me once already in this project: a
-subtly wrong number does not crash, it just quietly produces a bad answer.
-A box where x2 < x1 is a real thing that can happen if I ever mix up "width"
-and "x2" while converting the model's raw output, and I would rather find out
-from a validation error than from a reviewer asking why my bounding boxes
-look inside-out.
-"""
-
+# Request/response shapes for both endpoints, all in one place so /detect,
+# /ask and the tests aren't each building their own dict by hand.
 from __future__ import annotations
 
 from typing import Literal
@@ -20,19 +8,15 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class BBox(BaseModel):
-    """A box in absolute pixel coordinates, corners rather than centre+size.
-
-    I chose corner format for the API response specifically because it is
-    what a consumer actually wants to draw a rectangle - centre+width+height
-    is what the training pipeline needs internally, and there is no reason to
-    make an API caller redo that arithmetic.
-    """
+    """Corner-format box (not centre+size) - easier for a caller to draw."""
 
     x1: float
     y1: float
     x2: float
     y2: float
 
+    # Catches a mixed-up width/x2 conversion before it ships as an
+    # inside-out box - happened once, don't want it happening again.
     @field_validator("x2")
     @classmethod
     def x2_after_x1(cls, x2: float, info) -> float:
@@ -65,14 +49,8 @@ class ImageSize(BaseModel):
 
 
 class DetectResponse(BaseModel):
-    """
-    The full response for POST /detect.
-
-    model_version is here on purpose, not as an afterthought. If I retrain the
-    weights later, or a reviewer compares my hidden-set run against a run from
-    a different checkpoint, this field is what lets either of us tell which
-    model actually produced a given answer.
-    """
+    """Full response for POST /detect. model_version tags which checkpoint
+    produced this, useful once there's more than one."""
 
     detections: list[Detection]
     image_size: ImageSize
@@ -81,8 +59,7 @@ class DetectResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    """The natural-language half of the /ask endpoint. Image comes in as a
-    separate multipart file, not as JSON, so this only carries the question."""
+    """Image comes in as multipart, not JSON - this is just the question."""
 
     question: str = Field(min_length=1, max_length=500)
 
@@ -94,15 +71,9 @@ class ConfidenceStats(BaseModel):
 
 
 class RouteDecision(BaseModel):
-    """
-    What the intent router decided about a question, before any detection runs.
-
-    task_type is a closed set rather than a free string because the guardrail
-    in app/reasoning/guardrail.py branches on it directly - "count" behaves
-    differently from "presence" - and a typo in a free-form string would fail
-    silently by falling through to no guardrail rule at all, which is the
-    opposite of what a guardrail is for.
-    """
+    """What the router decided before any detection runs. task_type is a
+    closed set, not a free string - guardrail.py branches on it directly,
+    and a typo would just silently skip the guardrail."""
 
     needs_detection: bool
     target_classes: list[str]
@@ -112,17 +83,8 @@ class RouteDecision(BaseModel):
 
 
 class GuardrailVerdict(BaseModel):
-    """
-    Whether the evidence is good enough to answer confidently, and if not,
-    which rule said so.
-
-    I keep `detail` as a free dict rather than a fixed schema because each
-    rule wants to explain itself differently - "all_below_tau" wants to show
-    the observed max confidence, "query_saturated" wants to show the page's
-    region count against the budget - and forcing one shape onto all of them
-    would mean throwing away the specific number that makes the refusal
-    legible to whoever reads the response.
-    """
+    """Whether the evidence is good enough to answer, and why not if not.
+    detail stays a free dict since each rule explains itself differently."""
 
     triggered: bool
     rule: str | None = None
@@ -130,16 +92,10 @@ class GuardrailVerdict(BaseModel):
 
 
 class AskResponse(BaseModel):
-    """
-    The full response for POST /ask.
-
-    insufficient_information is a plain bool set by my own code from the
-    guardrail's verdict, never by asking the LLM whether it is confident. I
-    made that decision deliberately: if I let the model self-report its own
-    confidence, a well-written justification for guessing anyway is one bad
-    prompt away, and the deterministic gate is the difference between the
-    guardrail meaning something and it being a suggestion.
-    """
+    """Full response for POST /ask. insufficient_information is set from
+    the guardrail's verdict in code - never from the LLM self-reporting
+    confidence, since that's one prompt away from a confident-sounding
+    guess."""
 
     answer: str
     used_detection: bool

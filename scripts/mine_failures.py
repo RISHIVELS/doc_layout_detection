@@ -1,29 +1,15 @@
-"""
-Finds the test images my model handled worst, and renders them so I can look at
-what actually went wrong.
-
-The reason this script exists rather than me just eyeballing a few predictions:
-the brief grades failure analysis at 15% and says outright that a submission
-with no acknowledged failure cases is treated as a red flag. I did not want to
-write that section from imagination - "probably small objects, probably
-occlusion" - because that is exactly the kind of plausible-sounding text the
-brief is explicitly filtering for.
-
-So I score every test page by how wrong the prediction was, sort, and render the
-worst ones side by side with ground truth. The five cases in my memo are picked
-out of that pile. They are things my model actually did, and I can point at the
-image while explaining each one.
-
-The scoring is deliberately crude: greedy matching at IoU 0.5, then count what
-was left over on each side. I am not trying to compute a precise metric here -
-evaluate.py does that properly - I only need a ranking good enough to surface
-the interesting pages.
-
-Usage:
-    python scripts/mine_failures.py --weights runs/detect/.../best.pt \
-        --data data/doclaynet --out reports/failures --top 25
-"""
-
+# Finds the test pages the model got most wrong and renders them side by
+# side with ground truth. The 5 failure cases in the memo come from this,
+# not from guessing - the brief flags "no acknowledged failure cases" as a
+# red flag, so these need to be real, pointable-at examples.
+#
+# Scoring is deliberately crude (greedy IoU 0.5 matching) - just needs to
+# rank pages well enough to surface the interesting ones, not be a precise
+# metric (that's evaluate.py's job).
+#
+# Usage:
+#   python scripts/mine_failures.py --weights runs/detect/.../best.pt \
+#       --data data/doclaynet --out reports/failures --top 25
 from __future__ import annotations
 
 import argparse
@@ -43,7 +29,7 @@ PALETTE = [
 
 
 def iou(a: tuple[float, ...], b: tuple[float, ...]) -> float:
-    """Intersection over union for two xyxy boxes."""
+    """IoU for two xyxy boxes."""
     ax1, ay1, ax2, ay2 = a
     bx1, by1, bx2, by2 = b
 
@@ -77,23 +63,11 @@ def score_page(
     predictions: list[tuple[int, tuple[float, ...], float]],
     iou_threshold: float = 0.5,
 ) -> dict:
-    """
-    Greedily matches predictions to ground truth and counts what is left over.
-
-    I separate two kinds of mistake here rather than lumping them together,
-    because they have completely different root causes and I want the ranking to
-    surface both:
-
-    - A *miss* is a region the model did not find at all. Usually small, thin,
-      or on a page so dense the model ran out of queries.
-    - A *misclassification* is a region the model located correctly but labelled
-      wrongly. These are the interesting ones, because they are where the
-      semantics are genuinely ambiguous - Text against List-item, Title against
-      Section-header - rather than where the vision failed.
-
-    Counting them separately is what lets me write failure analysis about
-    annotation ambiguity instead of just saying "the model missed things".
-    """
+    """Greedy match + counts. Splits misses from misclassifications since
+    they have different causes - a miss is usually small/thin/query-
+    starved, a misclassification is usually genuine label ambiguity
+    (Text vs List-item, Title vs Section-header). That split is what lets
+    the memo talk about annotation ambiguity instead of just "missed stuff"."""
     unmatched_gt = list(range(len(ground_truth)))
     matched_predictions: set[int] = set()
 
@@ -128,15 +102,14 @@ def score_page(
         "misclassified": misclassified,
         "missed": len(unmatched_gt),
         "false_positives": false_positives,
-        # Misclassifications are weighted a little higher than plain misses
-        # because they are the cases I most want to look at.
+        # misclassifications weighted higher - they're the interesting ones
         "error_score": len(unmatched_gt) + false_positives + 1.5 * misclassified,
     }
 
 
-
 def _draw_labelled_box(draw, colour: str, x1, y1, x2, y2, label: str, font) -> None:
-    """Box outline plus a solid-background label, legible over any page content."""
+    """Box outline plus a solid background behind the label, legible over
+    any page content."""
     draw.rectangle([x1, y1, x2, y2], outline=colour, width=4)
     text_box = draw.textbbox((x1, y1), label, font=font)
     draw.rectangle(
@@ -147,7 +120,7 @@ def _draw_labelled_box(draw, colour: str, x1, y1, x2, y2, label: str, font) -> N
 
 
 def _render_comparison(image, ground_truth, predictions, out_path: Path) -> None:
-    """Draws ground truth on the left and the prediction on the right."""
+    """Ground truth on the left, prediction on the right."""
     from PIL import Image, ImageDraw
 
     width, height = image.size

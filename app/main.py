@@ -1,21 +1,6 @@
-"""
-The FastAPI app: two endpoints, /detect and /ask, plus /health.
-
-I kept this file thin on purpose - it does upload validation, error mapping,
-and logging, and then hands off to code that already has its own tests
-(Detector for inference, the reasoning pipeline for Part B). Nothing about
-the detection or reasoning logic itself lives here; if I ever need to check
-"is the model good", I look at evaluate.py, not this file.
-
-The one deliberate architectural choice worth calling out: the detector is
-provided via FastAPI's dependency injection (`get_detector`) rather than a
-bare module-level global the route handlers reach into directly. That is
-what lets tests/test_api.py swap in a stub detector per test and never touch
-a GPU or real weights file - dependency overrides are scoped to the test and
-cannot leak into another test's assertions the way patching a module global
-can.
-"""
-
+# FastAPI app: /health, /detect, /ask. Kept thin on purpose - upload
+# validation, error mapping, logging, then hand off to Detector or the
+# reasoning pipeline, both already tested elsewhere.
 from __future__ import annotations
 
 import os
@@ -33,23 +18,16 @@ from app.schemas import DetectResponse
 
 logger = configure_logging()
 
-# Read once at import time rather than on every request - the limit does not
-# change at runtime, and re-reading an env var per request is pure overhead.
-# Tests override this module attribute directly (monkeypatch) rather than
-# faking an environment variable, which is simpler for a single int.
+# Read once at import, not per-request. Tests override this directly
+# rather than faking an env var.
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "10")) * 1024 * 1024
 
 _detector_instance: Detector | None = None
 
 
 def get_detector() -> Detector:
-    """
-    FastAPI dependency that hands every route the same Detector instance.
-
-    Deliberately not a bare global the routes import directly - see the
-    module docstring for why. `app.dependency_overrides[get_detector] = ...`
-    is how tests substitute a stub without a GPU.
-    """
+    """FastAPI dependency - same Detector instance for every route.
+    Not a bare global so tests can override it with a stub."""
     global _detector_instance
     if _detector_instance is None:
         _detector_instance = Detector()
@@ -58,16 +36,9 @@ def get_detector() -> Detector:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Tries to load the model weights once at startup, but does not crash the
-    app if that fails.
-
-    I want /health to report accurate state from the moment the container is
-    up, rather than only discovering a bad MODEL_PATH on someone's first real
-    request. But a missing or bad checkpoint should not take the whole API
-    down - a service that is up and correctly reporting "model not loaded"
-    is far more debuggable than a container that will not even start.
-    """
+    """Tries to load weights at startup but doesn't crash if that fails -
+    a service that's up and reporting "model not loaded" is way easier to
+    debug than one that won't start at all."""
     try:
         get_detector().load()
         logger.info("startup: model loaded", extra={"extra_fields": {}})
@@ -84,15 +55,8 @@ app = FastAPI(title="Constrained Document Layout Detection API", lifespan=lifesp
 
 @app.exception_handler(Exception)
 async def handle_unexpected_error(request: Request, exc: Exception):
-    """
-    Catches anything a route did not explicitly handle and turns it into a
-    plain, safe JSON response instead of leaking an internal stack trace or
-    exception message to the caller.
-
-    The real error still goes to the server logs in full - this handler is
-    about what a caller outside the process gets to see, not about hiding
-    the problem from me.
-    """
+    """Catches anything a route didn't handle and returns a safe generic
+    message instead of leaking a stack trace. Full error still goes to logs."""
     logger.error(
         "unhandled exception",
         extra={"extra_fields": {"path": str(request.url), "error": str(exc)}},
@@ -104,18 +68,8 @@ async def handle_unexpected_error(request: Request, exc: Exception):
 
 
 def _read_and_validate_image(contents: bytes, content_type: str | None) -> Image.Image:
-    """
-    Shared validation for both endpoints: size, then declared type, then
-    actually decodable as an image.
-
-    I check the declared content-type first because it is the cheap check -
-    rejecting an obviously-wrong upload (someone posting a .txt file) should
-    not require decoding anything. But I do not stop there: a file can claim
-    `image/png` in its header and still be garbage bytes, so I also try to
-    actually open it and treat a decode failure the same as a wrong content
-    type, rather than letting it turn into an unhandled 500 deeper in the
-    detector.
-    """
+    """Size check, then content-type check, then an actual decode attempt -
+    a file can claim image/png and still be garbage."""
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
@@ -138,11 +92,6 @@ def _read_and_validate_image(contents: bytes, content_type: str | None) -> Image
 
 @app.get("/health")
 def health(detector: Detector = Depends(get_detector)):
-    """
-    Reports whether the model is actually loaded, not just whether the
-    process is running. A process that is up but has no usable weights is
-    not healthy in any sense a caller cares about.
-    """
     return {"status": "ok", "model_loaded": detector.is_loaded, "model_version": MODEL_VERSION}
 
 
@@ -175,15 +124,8 @@ async def ask(
     question: str = Form(..., min_length=1, max_length=500),
     detector: Detector = Depends(get_detector),
 ):
-    """
-    Part B: a natural-language question about the uploaded image.
-
-    All of the actual routing/evidence/guardrail/synthesis logic lives in
-    app.reasoning.pipeline.answer_question - this route is just upload
-    validation plus wiring, same as /detect. See that module (and its tests)
-    for the interesting behaviour: whether detection is even needed, and
-    when the response should honestly say it cannot answer.
-    """
+    """Part B. All the actual routing/evidence/guardrail/synthesis logic
+    lives in app.reasoning.pipeline - this is just upload validation + wiring."""
     with log_request(logger, "/ask", question_length=len(question)) as ctx:
         contents = await file.read()
         image = _read_and_validate_image(contents, file.content_type)

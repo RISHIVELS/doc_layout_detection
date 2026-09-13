@@ -1,16 +1,7 @@
-"""
-Turns a raw list of detections into the structured summary that the guardrail
-checks and the LLM writes its answer from.
-
-This file is deliberately the most boring code in the reasoning layer, and
-that is the point. Everything in here is a pure function over numbers I
-already have - no network calls, no model inference, nothing that could reach
-out and grab a pixel. That is not an implementation detail I happen to like;
-it is the load-bearing claim in my memo. I say the LLM cannot hallucinate what
-is on the page because it never sees the page, only this summary. That claim
-is only true if this file stays exactly this boring forever.
-"""
-
+# Detections -> structured summary. Pure functions only, no I/O, no model
+# calls, nothing that touches pixels - this is what makes it true that the
+# LLM downstream can't hallucinate what's on the page: it never sees it,
+# only this summary.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -27,10 +18,8 @@ class ConfStats:
 
 @dataclass
 class Relation:
-    """One spatial fact between two detected regions, e.g. a Caption sitting
-    inside a Table's extent. Kept as its own small type rather than a dict so
-    a typo in a key name (`"suject"`) fails at construction time instead of
-    silently vanishing into a KeyError three calls later."""
+    """A spatial fact between two regions, e.g. Caption inside a Table.
+    Own type instead of a dict so a typo'd key fails loudly, not silently."""
 
     kind: str
     subject: str
@@ -44,10 +33,8 @@ class Evidence:
     total_detections: int
     reading_order: list[str]
     relations: list[Relation] = field(default_factory=list)
-    # Raw per-detection confidence scores, kept alongside the summary stats
-    # above. I need these in the guardrail for the ambiguous-band rule, which
-    # asks "what fraction of the scores sit in a shaky range" - a question
-    # max/mean/min cannot answer on their own.
+    # Raw scores per class - guardrail's ambiguous-band rule needs the full
+    # distribution, not just max/mean/min.
     confidences_by_class: dict[str, list[float]] = field(default_factory=dict)
 
 
@@ -57,16 +44,9 @@ def _box_area(detection: Detection) -> float:
 
 
 def _contains(outer: Detection, inner: Detection, threshold: float = 0.85) -> bool:
-    """
-    True when `inner`'s box sits mostly inside `outer`'s box.
-
-    I use "mostly inside" (85% of the inner box's own area overlapping) rather
-    than requiring perfect containment, because DocLayNet's own human
-    annotators do not draw pixel-perfect boxes - a caption box drawn a couple
-    of pixels outside its parent table's border is completely normal and I do
-    not want that kind of ordinary annotation noise to make a real
-    caption-inside-table relationship disappear.
-    """
+    """True if inner sits mostly (85%+) inside outer. Not 100% - annotators
+    don't draw pixel-perfect boxes, a caption box a few px outside its
+    table shouldn't make the relationship disappear."""
     ox1, oy1, ox2, oy2 = outer.bbox.x1, outer.bbox.y1, outer.bbox.x2, outer.bbox.y2
     ix1, iy1, ix2, iy2 = inner.bbox.x1, inner.bbox.y1, inner.bbox.x2, inner.bbox.y2
 
@@ -81,17 +61,10 @@ def _contains(outer: Detection, inner: Detection, threshold: float = 0.85) -> bo
 
 
 def build_evidence(detections: list[Detection], image_width: int, image_height: int) -> Evidence:
-    """
-    The single entry point the rest of the reasoning layer uses to go from
-    "here is what the detector saw" to "here is a summary an LLM can reason
-    over safely".
+    """Main entry point: detections -> Evidence.
 
-    image_width and image_height are accepted even though the current
-    functions do not use them, because the moment I add a relation that needs
-    to reason about position relative to the page edge - "is this a
-    Page-header" - I want that plumbing already in place rather than having to
-    thread it through every caller a second time.
-    """
+    image_width/height aren't used yet - kept for when a relation needs
+    page-edge position (e.g. "is this near the top" for Page-header)."""
     class_counts: dict[str, int] = {}
     confidences_by_class: dict[str, list[float]] = {}
 
@@ -106,18 +79,9 @@ def build_evidence(detections: list[Detection], image_width: int, image_height: 
         for class_name, values in confidences_by_class.items()
     }
 
-    """
-    Reading order: sort top-to-bottom by the box's top edge, then left-to-right
-    for anything roughly on the same line.
-
-    This is a genuine simplification, not a real reading-order algorithm - a
-    true two-column page would interleave the columns under this sort, which
-    is wrong. I chose it anyway because DocLayNet's pages are mostly single-
-    column, it costs nothing to compute, and it is honest about what it is: a
-    reasonable default, not a claim that I solved document reading order. I
-    say so explicitly in the memo rather than let a confusion matrix quietly
-    imply the model got column ordering wrong when actually my sort did.
-    """
+    # Top-to-bottom, then left-to-right. Not real reading-order logic - a
+    # two-column page would interleave columns wrong under this sort. Good
+    # enough for DocLayNet's mostly-single-column pages, noted in the memo.
     ordered = sorted(detections, key=lambda det: (det.bbox.y1, det.bbox.x1))
     reading_order = [det.class_name for det in ordered]
 
@@ -127,11 +91,7 @@ def build_evidence(detections: list[Detection], image_width: int, image_height: 
             if outer is inner:
                 continue
             if _box_area(inner) >= _box_area(outer):
-                # A region cannot "contain" another region that is the same
-                # size or larger than it - that would just be two overlapping
-                # regions, which is a different (and, for DocLayNet, much
-                # rarer and less meaningful) relationship.
-                continue
+                continue  # can't "contain" something the same size or bigger
             if _contains(outer, inner):
                 relations.append(Relation(kind="contains", subject=outer.class_name, object=inner.class_name))
 

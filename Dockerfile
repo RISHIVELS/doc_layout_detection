@@ -1,43 +1,32 @@
-# CPU inference by default. The trained weights only need to run a forward
-# pass to serve requests - no GPU required for that, and it means this image
-# runs anywhere (a reviewer's laptop, a free-tier host) without needing CUDA
-# drivers or a GPU-enabled base image, which is a real deployment obstacle
-# a lot of ML demos skip past and then can't actually be run by anyone else.
+# CPU inference by default - a forward pass doesn't need a GPU, and this
+# way the image runs anywhere without CUDA drivers.
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for Pillow's image codecs and matplotlib's font rendering
-# (scripts/_render_utils.py leans on matplotlib's bundled DejaVu font for
-# legible labels - libgl/libglib cover headless image/font operations that
-# a minimal slim image does not ship with by default).
+# libgl/libglib for Pillow + matplotlib's font rendering (used for
+# legible label renders in scripts/_render_utils.py)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Installing requirements before copying the rest of the source means this
-# layer only gets invalidated when dependencies actually change, not on
-# every code edit - meaningfully faster rebuilds while iterating.
+# requirements first so this layer only rebuilds when deps actually change
 COPY requirements.txt .
 
-# CPU-only torch wheel. The default PyPI torch package pulls the full CUDA
-# toolkit (multiple GB) even when nothing in this image ever touches a GPU -
-# pointless bloat for a service that only does CPU inference.
+# CPU-only torch wheel - the default PyPI package pulls the full CUDA
+# toolkit (multiple GB) for an image that never touches a GPU
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
 COPY scripts/_render_utils.py scripts/__init__.py scripts/
 
-# Weights are not baked into the image - see README for exactly why (they are
-# too large for git, and rebuilding the image every time a checkpoint changes
-# is wasteful). MODEL_PATH is mounted or downloaded at container start instead.
+# Weights aren't baked into the image (too large for git, see README for
+# the download link) - mounted or fetched at container start instead
 ENV MODEL_PATH=/app/weights/best.pt
 ENV MAX_UPLOAD_MB=10
 
-# Runs as a non-root user - no functional need for root here, and no reason
-# to grant it when there is none.
 RUN useradd --create-home appuser && mkdir -p /app/weights && chown -R appuser:appuser /app
 USER appuser
 

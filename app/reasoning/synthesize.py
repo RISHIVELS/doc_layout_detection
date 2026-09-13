@@ -1,20 +1,8 @@
-"""
-Writes the final answer text, from evidence only - never from the image.
-
-This is the one function in the whole reasoning layer that is allowed to
-produce open-ended prose, and I kept its job as narrow as I could: turn a
-JSON summary of detections into a sentence a person would want to read. It
-does not decide whether to call the detector (router's job) and it does not
-decide whether the evidence is good enough to trust (guardrail's job). By the
-time this function runs, both of those questions are already answered, and
-its only remaining job is phrasing.
-
-I use the larger Groq model here (gpt-oss-120b) rather than the router's
-smaller one, because this is genuinely open-ended writing that has to read
-naturally, whereas routing is a closed classification problem that the small
-model handles fine under strict schema constraints.
-"""
-
+# Writes the final answer text from evidence only - never sees the image.
+# Only job here is phrasing: router already decided whether to detect,
+# guardrail already decided if the evidence is trustworthy. Uses the bigger
+# Groq model (gpt-oss-120b) since this is open-ended writing, unlike
+# routing which is closed classification the small model handles fine.
 from __future__ import annotations
 
 import os
@@ -25,13 +13,9 @@ from app.schemas import RouteDecision
 
 
 def _evidence_to_json(evidence: Evidence) -> dict:
-    """
-    Flattens Evidence into plain JSON-serialisable data.
-
-    This is the only thing the LLM ever receives about the image. No pixels,
-    no base64, nothing that could let the model describe something it did not
-    actually detect - it can only ever talk about what is in this dict.
-    """
+    """Flattens Evidence to plain JSON - the only thing the LLM ever sees
+    about the image. No pixels, so it can't describe anything it didn't
+    actually detect."""
     return {
         "class_counts": evidence.class_counts,
         "confidence_stats": {
@@ -69,16 +53,9 @@ def synthesize(
     route: RouteDecision,
     client=None,
 ) -> str:
-    """
-    Produces the final answer text.
-
-    I pass the guardrail's verdict into the prompt as a stated fact rather
-    than asking the model to judge confidence itself - the whole point of
-    building a separate deterministic guardrail is that this decision does
-    not get re-litigated by the LLM. If verdict.triggered is True, the model
-    is being told "the evidence is insufficient, explain why", not being
-    asked "do you think this is enough to answer".
-    """
+    """Produces the final answer text. Guardrail's verdict goes in as a
+    stated fact, not something the model re-judges - if triggered, it's
+    told "explain why this is insufficient", not asked "are you sure?"."""
     context = {
         "question": question,
         "task_type": route.task_type,
@@ -106,13 +83,9 @@ def synthesize(
         )
         return response.choices[0].message.content.strip()
     except Exception as error:
-        """
-        If synthesis itself fails - Groq down, timeout, bad key - I still owe
-        the caller a truthful answer rather than a stack trace. Falling back
-        to a template built directly from the guardrail/evidence means the
-        API stays honest about what it found even when the writing step that
-        was supposed to phrase it nicely is unavailable.
-        """
+        # Groq down/timeout/bad key - fall back to a plain template built
+        # from the guardrail/evidence instead of a stack trace, so the API
+        # stays honest even when the writing step is unavailable.
         if verdict.triggered:
             return (
                 f"I cannot answer confidently: {verdict.rule}. "

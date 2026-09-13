@@ -1,28 +1,15 @@
-"""
-Decides whether answering a question requires calling the detector at all.
-
-This is the first stage of Part B, and it is split into two layers on purpose:
-
-1. A cheap, deterministic regex prefilter for questions that obviously do not
-   need vision at all - greetings, meta-questions, general knowledge. No
-   reason to spend a Groq call and a few hundred milliseconds deciding that
-   "what is the capital of France" has nothing to do with the uploaded image.
-
-2. An LLM call, with Groq's strict `json_schema` mode, for everything the
-   prefilter is not confident about. Routing genuinely needs language
-   understanding - "how many tables" and "is this page well-organised" both
-   mention the page, but only one needs the detector - and I do not want a
-   hand-rolled keyword list quietly making that call badly.
-
-The one thing I built into the LLM prompt on purpose, rather than leaving it
-implicit: the model has to know it is routing for a *layout* detector, not a
-general vision model. A question like "what is the invoice total?" mentions
-the image and sounds like it needs detection, but my detector cannot read
-text - it only knows where regions are, not what they say. Getting this
-distinction right in the prompt is what makes the out-of-scope refusal in my
-memo a real architectural boundary instead of a coincidence.
-"""
-
+# Decides if a question needs the detector at all. Two layers:
+# 1. Cheap regex prefilter for the obvious cases (greetings, general
+#    knowledge) - no point spending a Groq call on "what's the capital of
+#    France".
+# 2. LLM call (Groq, strict json_schema) for everything else. Routing
+#    genuinely needs language understanding - a keyword list can't tell
+#    "how many tables" from "is this page well organised".
+#
+# Key thing baked into the prompt: the model knows it's routing for a
+# *layout* detector, not general vision. "What's the invoice total?"
+# mentions the image but the detector can't read text - only a prompt that
+# says so explicitly catches that and routes it out_of_scope.
 from __future__ import annotations
 
 import os
@@ -31,11 +18,9 @@ import re
 from app.constants import CLASS_NAMES
 from app.schemas import RouteDecision
 
-# Patterns for questions the prefilter can answer with confidence, without
-# spending an LLM call. I kept this list short and specific rather than
-# trying to be clever with it - the moment a pattern here is even slightly
-# ambiguous, it belongs with the LLM, not here. A wrong prefilter decision is
-# worse than a slow one, because it skips the LLM's judgement entirely.
+# Kept short and specific on purpose - if a pattern is even slightly
+# ambiguous it belongs with the LLM. A wrong prefilter call is worse than a
+# slow one since it skips the LLM's judgement entirely.
 _GREETING_PATTERN = re.compile(
     r"^\s*(hi|hello|hey|thanks|thank you)[\s!.,]*$", re.IGNORECASE
 )
@@ -48,16 +33,9 @@ _GENERAL_KNOWLEDGE_PATTERN = re.compile(
 
 
 def prefilter(question: str) -> RouteDecision | None:
-    """
-    Returns a RouteDecision for the small set of questions I am confident
-    about without asking the LLM, or None to defer to the LLM router.
-
-    Returning None is the important design point here: this function is only
-    ever allowed to say "definitely no detection needed", never "definitely
-    yes". Deciding that a question *does* need the detector, and which
-    classes it needs, requires actually understanding the sentence - that is
-    exactly the job I want the LLM doing, not a regex.
-    """
+    """Only ever returns "definitely no detection needed", never "yes" -
+    deciding detection IS needed requires actually understanding the
+    sentence, which is the LLM's job. None means defer to it."""
     stripped = question.strip()
 
     if _GREETING_PATTERN.match(stripped):
@@ -122,20 +100,12 @@ Decide:
 
 
 def route(question: str, client=None) -> RouteDecision:
-    """
-    Full routing decision: prefilter first, then the LLM if the prefilter
-    deferred.
+    """Prefilter first, then the LLM if it deferred. `client` is injectable
+    for tests/pipeline to swap in a stub - see pipeline.py.
 
-    `client` is injectable so tests and the pipeline can supply a stub instead
-    of a real Groq client - see app/reasoning/pipeline.py for how it is wired
-    in production.
-
-    On any LLM error - a bad key, a timeout, a schema violation Groq itself
-    could not satisfy - I fail closed to out_of_scope rather than guessing
-    that detection is needed. Wrongly skipping a real question is a worse
-    failure than wrongly declining an answerable one; the second at least
-    tells the user something true.
-    """
+    Fails closed to out_of_scope on any LLM error (bad key, timeout, etc)
+    rather than guessing detection is needed - skipping a real question is
+    worse than declining an answerable one."""
     prefiltered = prefilter(question)
     if prefiltered is not None:
         return prefiltered

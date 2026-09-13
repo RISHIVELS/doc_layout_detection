@@ -1,35 +1,18 @@
-"""
-Evaluates the trained model on the held-out test split.
-
-I wanted this to produce more than one number. The brief weights "evaluation
-methodology and honesty of self-reported metrics" separately from raw
-performance, and having thought about it, a single aggregate mAP genuinely
-cannot answer the questions I care about:
-
-- Did the model learn document structure, or did it learn what financial
-  reports look like? Financial reports are the largest slice of DocLayNet, so a
-  model that is strong there and useless on patents still posts a respectable
-  headline score. Only a per-category breakdown exposes that.
-
-- Which classes is it actually bad at, and is that a model failure or a
-  consequence of a decision I made? I predicted before training that the thin
-  classes would suffer at 640px input. Per-class AP is where I find out whether
-  I was right.
-
-- Is it losing recall for a reason that has nothing to do with learning? RT-DETR
-  emits a fixed number of predictions per image. A page with more regions than
-  that cannot be fully detected no matter how good the weights are. I measure
-  how often that happens rather than letting it hide inside a low recall number.
-
-- Are the train and test splits genuinely independent? DocLayNet pages come
-  from multi-page PDFs. If pages from the same source document sit on both
-  sides of the split, my test numbers are flattering. I measure the overlap.
-
-Usage:
-    python scripts/evaluate.py --weights runs/detect/rtdetr_doclaynet/weights/best.pt \
-                               --data data/doclaynet/doclaynet.yaml --out reports
-"""
-
+# Evaluates the trained model on the held-out test split. One aggregate
+# mAP can't answer the questions that actually matter, so this produces:
+#   - per-class AP (which classes are actually weak, and was that
+#     predictable given the 640px downscale)
+#   - per-document-category mAP (did it learn structure, or just what
+#     financial reports look like - the biggest slice of the data)
+#   - query-budget saturation rate (RT-DETR has a fixed number of
+#     predictions per image - dense pages lose recall for a reason that
+#     has nothing to do with training quality)
+#   - measured train/test source-PDF overlap (used the author's splits for
+#     reproducibility, but that means inheriting whatever leakage they have)
+#
+# Usage:
+#   python scripts/evaluate.py --weights runs/detect/rtdetr_doclaynet/weights/best.pt \
+#                              --data data/doclaynet/doclaynet.yaml --out reports
 from __future__ import annotations
 
 import argparse
@@ -52,20 +35,11 @@ def _load_manifest(data_root: Path, split: str) -> list[dict]:
 
 
 def measure_split_leakage(data_root: Path) -> dict:
-    """
-    Checks whether any source PDF has pages in both the training and test sets.
-
-    I used the dataset author's published splits rather than rolling my own,
-    which is the reproducible choice, but it does mean I inherited whatever
-    splitting logic they used. If pages 4 and 9 of the same annual report ended
-    up on opposite sides of the boundary, those two pages share fonts, column
-    layout and house style, and my test score is measuring memorisation as much
-    as generalisation.
-
-    I am not fixing this - re-splitting would make my numbers incomparable to
-    published DocLayNet work. I am measuring it so the number appears in my memo
-    instead of sitting there unexamined.
-    """
+    """Checks if any source PDF has pages on both sides of train/test.
+    Used the author's published splits rather than re-splitting (keeps
+    numbers comparable to published work), but that means inheriting
+    whatever overlap they have. Not fixing it, just measuring and
+    reporting it."""
     train = {row["source_pdf"] for row in _load_manifest(data_root, "train")}
     test_rows = _load_manifest(data_root, "test")
     if not train or not test_rows:
@@ -84,17 +58,10 @@ def measure_split_leakage(data_root: Path) -> dict:
 
 
 def measure_query_saturation(data_root: Path, budget: int = DEFAULT_QUERY_BUDGET) -> dict:
-    """
-    Counts test pages that contain more ground-truth regions than the model can
-    possibly emit.
-
-    This one is easy to miss. RT-DETR has a fixed set of object queries and each
-    produces at most one box, so the number of detections per image is capped by
-    architecture, not by confidence. A page with more regions than the budget
-    will lose recall for a reason that has nothing to do with how well it
-    trained, and without measuring it I would be attributing that loss to the
-    wrong cause in my failure analysis.
-    """
+    """RT-DETR emits a fixed number of boxes per image regardless of
+    confidence - a page with more regions than that structurally can't be
+    fully detected. Measuring this separately so it doesn't get
+    misattributed as a training/recall problem in the failure analysis."""
     rows = _load_manifest(data_root, "test")
     if not rows:
         return {"measured": False}
@@ -113,14 +80,9 @@ def measure_query_saturation(data_root: Path, budget: int = DEFAULT_QUERY_BUDGET
 
 
 def per_category_map(weights: str, data_root: Path, base_yaml: Path, out_dir: Path) -> dict:
-    """
-    Runs validation once per document category.
-
-    Ultralytics will accept a text file listing image paths in place of a
-    directory, so I write one list per category and validate against each. Six
-    small extra validation passes, and it turns one opaque number into the
-    breakdown that actually tells me whether the model generalises.
-    """
+    """Runs validation once per document category by writing a filtered
+    image-list yaml per category. Six extra small val passes, turns one
+    opaque number into a real generalisation check."""
     rows = _load_manifest(data_root, "test")
     if not rows:
         return {}
@@ -139,8 +101,7 @@ def per_category_map(weights: str, data_root: Path, base_yaml: Path, out_dir: Pa
     results: dict[str, dict] = {}
 
     for category, images in sorted(by_category.items()):
-        # Too few pages and the mAP is noise rather than a measurement, so I
-        # report the count alongside every figure and skip the tiny ones.
+        # too few pages = noise, not a measurement - skip and say so
         if len(images) < 10:
             results[category] = {"pages": len(images), "skipped": "too few pages to be meaningful"}
             continue
@@ -182,12 +143,9 @@ def main() -> None:
     print("Evaluating on the held-out test split...")
     metrics = RTDETR(args.weights).val(data=args.data, split="test", plots=True)
 
-    """
-    Ultralytics returns per-class AP in `box.maps`, indexed by class id. I zip
-    it back against my own class list rather than trusting the order, because
-    getting this mapping wrong would attribute every class's score to its
-    neighbour and the table would still look entirely plausible.
-    """
+    # zip against my own class list rather than trusting box.maps' order -
+    # a mismatch here would attribute every class's score to its neighbour
+    # and still look completely plausible
     per_class = {
         name: round(float(ap), 4)
         for name, ap in zip(CLASS_NAMES, list(metrics.box.maps))

@@ -1,40 +1,17 @@
-"""
-Turns the Hugging Face DocLayNet-base rows into the image/label layout that
-Ultralytics expects on disk.
-
-This script ended up being the most careful piece of code in the project, and
-not because the conversion maths is hard. It is because everything that can go
-wrong here goes wrong *silently*. Bad labels do not raise. Training runs to
-completion, the loss curve looks normal, and the only symptom is that the final
-numbers are worse than they should be for reasons you cannot see. By the time
-you notice, you have burned your GPU quota.
-
-So there are three things this file does beyond the obvious conversion, each of
-which came from a specific worry:
-
-1. It collapses the repeated bounding boxes. DocLayNet-base stores the parent
-   block's box once per text line, so a six-line paragraph shows up as six
-   identical annotations. Writing those out raw inflates a 40-region page into
-   a ~1,100-annotation page and teaches the model a nonsense prior about object
-   density.
-
-2. It drops degenerate boxes and counts them. Zero-area labels turn into NaN
-   losses several epochs into training, which is a horrible thing to debug.
-
-3. It can render a sample of pages with the decoded class names drawn on, so I
-   can actually look at them and confirm the category indices mean what I think
-   they mean. I did not want to take the class ordering on trust from a dataset
-   card - if that is off by one, every number I report afterwards is fiction.
-
-Everything it did is written to prep_report.json so the counts end up in the
-memo instead of being lost.
-
-Usage:
-    python scripts/prepare_dataset.py --out data/doclaynet
-    python scripts/prepare_dataset.py --out data/doclaynet --verify 12
-    python scripts/prepare_dataset.py --out data/doclaynet --limit 20   # smoke test
-"""
-
+# Converts the HF DocLayNet-base dataset into the image/label layout
+# Ultralytics expects. Everything that can go wrong here goes wrong
+# silently - bad labels don't raise, training just quietly learns the
+# wrong thing. Three things beyond the obvious conversion:
+#   1. collapses repeated per-line boxes (a 40-region page can show up as
+#      ~1,100 duplicate annotations otherwise)
+#   2. drops degenerate boxes and counts them (zero-area -> NaN loss later)
+#   3. can render a sample with decoded labels drawn on, so I can eyeball
+#      that the class index mapping is actually right
+#
+# Usage:
+#   python scripts/prepare_dataset.py --out data/doclaynet
+#   python scripts/prepare_dataset.py --out data/doclaynet --verify 12
+#   python scripts/prepare_dataset.py --out data/doclaynet --limit 20   # smoke test
 from __future__ import annotations
 
 import argparse
@@ -43,8 +20,6 @@ import random
 from collections import Counter
 from pathlib import Path
 
-# The class list lives in app/constants.py and nowhere else. See the note in
-# that file about why I stopped duplicating it.
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -53,27 +28,16 @@ from app.constants import CLASS_NAMES, ID_TO_CLASS  # noqa: E402
 
 HF_DATASET = "pierreguillou/DocLayNet-base"
 
-# The Hugging Face split names do not match the directory names Ultralytics
-# conventionally uses, so I map them explicitly rather than relying on both
-# sides happening to agree.
+# HF split names don't match Ultralytics' directory convention
 SPLITS = {"train": "train", "validation": "validation", "test": "test"}
 
 
 def coco_to_yolo(
     bbox: list[float], img_w: int, img_h: int
 ) -> tuple[float, float, float, float]:
-    """
-    Converts one box from DocLayNet's format into the one Ultralytics wants.
-
-    DocLayNet gives [x, y, w, h] in absolute pixels, measured from the top-left
-    corner of the page. Ultralytics wants [x_centre, y_centre, w, h] normalised
-    into 0-1.
-
-    The part worth being careful about is the corner-to-centre shift. If you
-    forget it, every box lands half its own size up and to the left. That is
-    subtle enough that it does not look like a bug - it looks like the model is
-    slightly imprecise at localisation - which is exactly why I tested it.
-    """
+    """DocLayNet gives [x, y, w, h] top-left in pixels. Ultralytics wants
+    [x_centre, y_centre, w, h] normalised 0-1. Easy to get the corner-to-
+    centre shift wrong without noticing - tested for that reason."""
     x, y, w, h = bbox
     x_centre = (x + w / 2) / img_w
     y_centre = (y + h / 2) / img_h
@@ -81,17 +45,9 @@ def coco_to_yolo(
 
 
 def is_valid_bbox(bbox: list[float], img_w: int, img_h: int) -> bool:
-    """
-    Rejects boxes that would poison training rather than letting them through.
-
-    Zero-area boxes are the dangerous ones: Ultralytics accepts them and then
-    produces NaN losses some epochs later, well after you have stopped watching.
-    Out-of-bounds boxes are less lethal but they normalise to values outside
-    0-1, which quietly breaks the loss computation.
-
-    I count every rejection rather than just dropping it, because "how clean was
-    your data" is a question I would rather answer with a number.
-    """
+    """Rejects zero-area/out-of-bounds boxes before they turn into NaN
+    losses several epochs in. Counts rejections rather than just dropping
+    silently."""
     x, y, w, h = bbox
     if w <= 0 or h <= 0:
         return False
@@ -105,22 +61,10 @@ def is_valid_bbox(bbox: list[float], img_w: int, img_h: int) -> bool:
 def dedupe_annotations(
     bboxes: list[list[float]], categories: list[int]
 ) -> list[tuple[tuple[float, ...], int]]:
-    """
-    Collapses the per-line repetition in DocLayNet-base down to one entry per
-    actual region.
-
-    This is the single most important function in the file. The dataset stores
-    `bboxes_block` aligned to text lines, so the block box for a paragraph is
-    repeated once for every line inside it. A dense page can carry over a
-    thousand entries describing perhaps forty real regions.
-
-    I dedupe on the (box, category) pair rather than the box alone, because very
-    occasionally two different classes are labelled over the same extent and
-    throwing one away would be losing real signal.
-
-    I keep first-seen order so the label files come out byte-identical between
-    runs, which makes it easy to diff the effect of a change to this script.
-    """
+    """DocLayNet-base repeats a block's box once per text line inside it -
+    a paragraph with 6 lines shows up as 6 identical entries. Dedupe on
+    (box, category) rather than box alone, since two classes occasionally
+    share the same extent. First-seen order kept so output is reproducible."""
     if len(bboxes) != len(categories):
         raise ValueError(
             f"bboxes and categories must be the same length, "
@@ -143,14 +87,9 @@ def dedupe_annotations(
 def _write_split(
     dataset, split_name: str, out_dir: Path, limit: int | None
 ) -> dict:
-    """
-    Writes one split to disk and reports exactly what it did.
-
-    The counts returned here are the ones that end up in the memo. I wanted the
-    deduplication figure in particular to be visible, because "I removed 96% of
-    the raw annotations" is a claim that needs a number attached to it or it
-    sounds like I broke something.
-    """
+    """Writes one split to disk, returns the counts (these end up in the
+    memo, especially the dedupe ratio - "removed 96% of raw annotations"
+    needs a number next to it or it sounds like something broke)."""
     image_dir = out_dir / "images" / split_name
     label_dir = out_dir / "labels" / split_name
     image_dir.mkdir(parents=True, exist_ok=True)
@@ -169,21 +108,8 @@ def _write_split(
         "doc_category_counts": Counter(),
     }
 
-    """
-    I keep a per-image manifest as well as the aggregate counts.
-
-    The counts alone tell me the dataset is balanced; the manifest is what lets
-    evaluate.py split mAP by document category afterwards. I need that because
-    one aggregate number cannot tell me whether the model learned document
-    structure or just learned what financial reports look like - and financial
-    reports are the biggest slice of DocLayNet, so a model that is good at those
-    and useless on patents would still post a respectable headline score.
-
-    I also record the source PDF filename here. DocLayNet pages come from
-    multi-page documents, so if pages from the same PDF ended up on both sides
-    of the train/test boundary my test numbers are optimistic. I would rather
-    measure that overlap and report it than assume it is zero.
-    """
+    # per-image manifest for evaluate.py's per-category mAP breakdown, and
+    # for measuring train/test source-PDF leakage
     manifest: list[dict] = []
 
     for index in range(total):
@@ -205,8 +131,7 @@ def _write_split(
             lines.append(f"{category} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
             stats["class_counts"][ID_TO_CLASS.get(category, f"UNKNOWN_{category}")] += 1
 
-        # A page with no surviving annotations is legitimate (a blank page) but
-        # it is also what a conversion bug looks like, so I count them.
+        # blank page is legit, but also what a conversion bug looks like
         if not lines:
             stats["empty_pages"] += 1
 
@@ -238,33 +163,17 @@ def _write_split(
 
 
 def _render_label_check(dataset, out_dir: Path, sample_size: int) -> None:
-    """
-    Draws boxes with their decoded class names onto a handful of pages so I can
-    look at them with my own eyes.
-
-    This exists because of one specific fear. The class ordering I am using is
-    0-indexed alphabetical, which I inferred rather than found stated
-    unambiguously. If it is off by even one, `Table` becomes `Section-header`
-    everywhere, training proceeds perfectly happily, and every metric and every
-    failure-case analysis I write afterwards is describing a model that learned
-    something other than what I claim.
-
-    No automated test can catch that - the data is self-consistent either way.
-    The only check that works is rendering a page and seeing whether the box
-    labelled "Table" is actually drawn around a table. So I look before I train.
-    """
+    """Draws decoded class labels on a sample of pages so I can eyeball
+    them. My class ordering (0-indexed alphabetical) is inferred, not
+    confirmed - if it's off by one, Table becomes Section-header
+    everywhere and training won't complain about it. No automated test
+    catches that, only looking does."""
     from PIL import ImageDraw
 
     from scripts._render_utils import load_label_font
 
     label_font = load_label_font(28)
 
-    # Writing straight into out_dir rather than climbing to its parent, same
-    # as prep_report.json and doclaynet.yaml below. My first version reached
-    # up to out_dir.parent, which put this somewhere I then pointed the
-    # notebook's check-cell at incorrectly - "up one, then back down two"
-    # is exactly the kind of path arithmetic that is easy to get wrong once
-    # and never notice, because the directory still gets created either way.
     check_dir = out_dir / "label_check"
     check_dir.mkdir(parents=True, exist_ok=True)
 
@@ -288,13 +197,8 @@ def _render_label_check(dataset, out_dir: Path, sample_size: int) -> None:
             label = ID_TO_CLASS.get(category, "?")
             draw.rectangle([x, y, x + w, y + h], outline=colour, width=4)
 
-            """
-            Plain coloured text sitting directly on a document page is
-            unreadable half the time - the page is mostly white, but a label
-            landing on dark scanned text or another box's fill is invisible.
-            I draw a solid rectangle behind the label first, sized to the
-            actual text, so it reads the same regardless of what is under it.
-            """
+            # solid background behind the label - plain text is invisible
+            # on dark scanned content otherwise
             text_box = draw.textbbox((x, y), label, font=label_font)
             draw.rectangle(
                 [text_box[0] - 2, text_box[1] - 2, text_box[2] + 2, text_box[3] + 2],
@@ -330,22 +234,12 @@ def main() -> None:
     from datasets import load_dataset
     from datasets.features import Image as HFImage
 
-    """
-    The dataset repo's own loading script declares bboxes_block/bboxes_line
-    as Sequence(Sequence(Value("int64"))). That is simply wrong - the actual
-    coordinates in the underlying data are floats (I hit one directly:
-    139.664355). Older pyarrow used to silently floor a float into that int64
-    slot; a newer pyarrow (which is what Kaggle ships) refuses the lossy cast
-    outright and the whole load fails with `ArrowInvalid: Float value ...
-    was truncated converting to int64`.
-
-    I cannot edit someone else's script on the Hub, but `load_dataset` lets me
-    override the schema it builds against. So I reconstruct the script's exact
-    feature dict from source and correct only the two fields that are wrong,
-    to float64. Everything else is left byte-for-byte identical to the
-    original so I am not silently changing anything I have not verified needs
-    changing.
-    """
+    # The dataset's own loading script declares these as int64, but the
+    # real coordinates are floats (hit one directly: 139.664355). Newer
+    # pyarrow refuses that lossy cast where older versions silently
+    # floored it. Can't edit someone else's script, so override the
+    # schema on load instead - copied field-for-field, only these two
+    # fixed to float64.
     doclaynet_features = Features({
         "id": Value("string"),
         "texts": Sequence(Value("string")),
@@ -367,38 +261,17 @@ def main() -> None:
 
     print(f"Loading {HF_DATASET} (3.8 GB on first run, cached after)...", flush=True)
     try:
-        """
-        trust_remote_code=True is required because this dataset repo is the
-        legacy "loading script" format: it ships a small Python file
-        (DocLayNet-base.py) that datasets executes to build the dataset,
-        rather than reading a static Parquet/Arrow file directly.
-
-        Without this flag, `datasets` stops and asks for interactive
-        confirmation before running someone else's code - a sensible default
-        for a random dataset off the Hub. It also means the prompt blocks
-        forever in a non-interactive run, which is exactly how I run this: the
-        Kaggle notebook uses Save & Run All (Commit) so the session survives
-        me closing the browser, and there is no terminal on the other end to
-        type "y" into.
-
-        I am passing it explicitly rather than just suppressing the prompt,
-        because I looked at what the script does before trusting it: it is
-        the dataset author's own conversion of IBM's DocLayNet into the
-        HF `datasets` structure, nothing more.
-        """
+        # trust_remote_code=True: this repo ships a loading script rather
+        # than static parquet. Without this it prompts for confirmation,
+        # which hangs forever under Kaggle's non-interactive commit runs.
+        # Checked what the script does first - it's just the author's own
+        # DocLayNet -> HF datasets conversion, nothing else.
         dataset = load_dataset(HF_DATASET, trust_remote_code=True, features=doclaynet_features)
     except RuntimeError as error:
-        """
-        This is the one dependency failure I actually hit while building this,
-        so I am catching it by name rather than leaving the next person (which
-        might be me, or a reviewer reproducing the run) to decode a stack trace.
-
-        pierreguillou/DocLayNet-base ships as a legacy "loading script" dataset
-        repo, and Hugging Face's `datasets` library removed loading-script
-        support outright in 4.0.0. requirements.txt pins `datasets<4.0.0` for
-        exactly this reason, but if someone's environment already has a newer
-        version cached, this is what they hit.
-        """
+        # datasets>=4.0.0 dropped loading-script support entirely -
+        # requirements.txt pins <4.0.0 for this reason, but if an
+        # environment already has a newer version cached, this is what
+        # they'll hit.
         if "no longer supported" in str(error):
             raise RuntimeError(
                 f"{error}\n\n"
@@ -435,13 +308,8 @@ def main() -> None:
 
 
 def _write_data_yaml(out_dir: Path) -> None:
-    """
-    Emits the Ultralytics dataset config next to the data it describes.
-
-    I generate this rather than hand-writing it so the class names in the YAML
-    physically cannot drift from app/constants.py. That drift is the exact bug
-    I was worried about when I consolidated the class list in the first place.
-    """
+    """Generates the Ultralytics config instead of hand-writing it, so
+    class names can't drift from app/constants.py."""
     names = "\n".join(f"  {idx}: {name}" for idx, name in enumerate(CLASS_NAMES))
     yaml = (
         "# Generated by scripts/prepare_dataset.py - do not edit by hand.\n"
