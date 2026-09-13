@@ -24,11 +24,11 @@ endobj
 endobj
 4 0 obj
 <<
-/Annots [ 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R ]
-/Contents 11 0 R
+/Annots [ 5 0 R 6 0 R 7 0 R 8 0 R 9 0 R 10 0 R 11 0 R 12 0 R ]
+/Contents 13 0 R
 /MediaBox [ 0 0 612 792 ]
 /Resources <<
-/Font 12 0 R
+/Font 14 0 R
 /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >>
 /Rotate 0
@@ -43,10 +43,10 @@ endobj
 /A <<
 /S /URI
 /Type /Action
-/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection)
+/URI (https\072\057\057huggingface\056co\057spaces\057RISHIVEL\057RAP\137DocLayout\137DetectionD)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 552.55 443.63 565.55 ]
+/Rect [ 166.6 650.71 478.97 663.71 ]
 /Subtype /Link
 /Type /Annot
 >>
@@ -56,10 +56,10 @@ endobj
 /A <<
 /S /URI
 /Type /Action
-/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057releases\057download\057weights\055v1\057best\056pt)
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 529.55 529.78 542.55 ]
+/Rect [ 166.6 610.71 397.83 623.71 ]
 /Subtype /Link
 /Type /Annot
 >>
@@ -72,7 +72,7 @@ endobj
 /URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057releases\057download\057weights\055v1\057best\056pt)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 516.55 295.77 529.55 ]
+/Rect [ 185.4 396.11 341.3584 408.11 ]
 /Subtype /Link
 /Type /Annot
 >>
@@ -82,10 +82,10 @@ endobj
 /A <<
 /S /URI
 /Type /Action
-/URI (https\072\057\057huggingface\056co\057spaces\057RISHIVEL\057RAP\137DocLayout\137DetectionD)
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057reports\057evaluation\137report\056pdf)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 413.55 524.77 426.55 ]
+/Rect [ 185.4 325.11 305.5704 337.11 ]
 /Subtype /Link
 /Type /Annot
 >>
@@ -95,10 +95,10 @@ endobj
 /A <<
 /S /URI
 /Type /Action
-/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057reports\057evaluation\137report\056pdf)
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057reports\057metrics\056json)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 379.55 526.44 392.55 ]
+/Rect [ 185.4 304.11 268.2184 316.11 ]
 /Subtype /Link
 /Type /Annot
 >>
@@ -108,30 +108,56 @@ endobj
 /A <<
 /S /URI
 /Type /Action
-/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057reports\057evaluation\137report\056pdf)
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057tree\057main\057reports\057failure\137examples)
 >>
 /Border [ 0 0 0 ]
-/Rect [ 212.4 366.55 306.34 379.55 ]
+/Rect [ 185.4 283.11 291.2368 295.11 ]
 /Subtype /Link
 /Type /Annot
 >>
 endobj
 11 0 obj
 <<
-/Filter [ /ASCII85Decode /FlateDecode ]
-/Length 1167
+/A <<
+/S /URI
+/Type /Action
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057memo\057BUILD\137LOG\056md)
 >>
-stream
-GauHJ?$D`2&AIm?bZ0[OgOQn`LqU-W2mF`"$adUh3B7?qP4DUTP1+p<@8Uk=XO0KI/.So]bWI]-/:e9P6sRDBi0+96rr`T2B*Lbh<,c`kFBUn5AFX9@,8ka"GkGOQ9-#%&?!&3?TS8SlAptbj)!@b]oP/89X-q^CIfbh(?/E*J&!tVk"Df`(/.%L?luF#"71lE=4)c7Wq6'kj"ckMp\m[/+]NC:g>.#[h.ofpK.`2Z?<Ms,&gDKM^g/hudnD"Hdk/2H?a?0q7`c46XDug_qMc>5m:PK*NFVc4TI%mW8n9.-DkmFCqWLPYW-V-bGDdn\jRodmQ.%6ra^1+,fm.L"&k`2$hDU=>Tml69K&n,]9Ac'c4fhQKSd1M_RKfUE`Kd]UVC7)V3%GHHa.q=la\93:tjW<"2^25ls"4OM_PuuT"pu*7Rp[>Q+rJ]p7ppWPdelB1+hh&,%VE]=[Q[JN%X*%tti:#gtqSof7Z`<<5.p+Zhbe1'Z?AJHUS3kN,Zj:rGs#NEMd9S:q3i&YeO;+Na2-eYX%"kRl(L9!Ent8//4=`V<EY.ee3L.66QE?j/1]1kAg9R>s&!<Oa_-^*T',@O0G(q\1$_`ATT1/7n_I1ZI6eP4p$O+r('+6g5&XEGJnEG!,V68_:^:Z^[q*a9m/%Ci64cuN&OG/gQfIVt`E`aIJOe$*2p)Nd"5FZ.cjEaLuOZVSSL\6bt=2NGa>`cLOa]cq7UK;"LXH1qT$^L"fPuM3Y+\&$%F:N46Y_?*-)_9btX]0#9G["=[lD:LoB@G%.9Qq>@UN*.#k%&9KP"\=1]g=JSZ46:!hVo[1n;2_BiY3>.P![!0RDC26=d9i^2V"2*!W)itj!_*K"AJp7Hh\dkC1#IXIqu*2O\bV>Z9'^l!.3o<;]GC!/i('g)V'si-hgG]d7SVOp,go*E+dj4HjbiFj2@PEW,tJ$Wj\/\0(bL<p=:u]NRFdGA)EA`R"a<L^N/;,IO8Y*m%jJX<gB]K]5(;AaOt=6g0n:&@!qWiADT=pB/mW[?^"I<?W!"]C7gYMB&[H;R/DBY5"V-F:%W1\29k<':[td5fLAN))LkrGilAh%^U?r\2t=kI\1CHthP:J4N1j/D#:!0)I0^MEEs<Sq8a.<Ul0io=3D1Ja21CIL4MhkVE\/BbFeSII>SXOZ~>
-endstream
+/Border [ 0 0 0 ]
+/Rect [ 185.4 262.11 283.0488 274.11 ]
+/Subtype /Link
+/Type /Annot
+>>
 endobj
 12 0 obj
 <<
-/F1 13 0 R
-/F2 14 0 R
+/A <<
+/S /URI
+/Type /Action
+/URI (https\072\057\057github\056com\057RISHIVELS\057doc\137layout\137detection\057blob\057main\057scripts\057train\056py)
+>>
+/Border [ 0 0 0 ]
+/Rect [ 185.4 149.11 247.2608 161.11 ]
+/Subtype /Link
+/Type /Annot
 >>
 endobj
 13 0 obj
+<<
+/Filter [ /ASCII85Decode /FlateDecode ]
+/Length 2232
+>>
+stream
+GauHLD0+Dj&H88.Z#_")kY3asD%,3J\06DMg^p.:1g`;]#U=s@^JN#^jknrf`eGbOVG*ls(tk'qTA=pePmQ[LO/Pi5"LrHEnsKJ4_!uqWRKZG&g<S60.pY:o]Xo@+J`Tl7VQLffqQj?O>1J.lWP1?Ed1oD^?>6fnh(Yo!p)B@7"Y@'3qQ*kt>/2hM"kKR#1gA\^d%jCY(<nNP#-m.S2kS2PAF5LrC8PEB?rc=b:'d\i;f9"6@CZc;+0fjL7ViEO"Kg>DdT)>S!8e3s#!`G^EE'[>htFkqW";Y`\&.:#MX,&d@9dG0b)InM[a;U5FqrXRG3;2p9u16^^eZJqD%Y$G:fR@ScIaL`^4Z$Do]cfn>hEq-kYFp^[>'ZL_)kk]l!R,-$sg_Iq.p&18V",An/;)U*5I*2ni_,fBei1/7P8=)ntR)V@+8R$VpQ4"X3KO?D`>nrgDa<r)N_p*L8Z7#]Q`nu`!&cBE?l/lI0k1Knt!;tZrhoe5+;3n$lKeb19`e&!%?#_'!LX/A;nru70s*='rM@3o?#%CW9\4H[dVa?XU_eB(]NOSj[hsaQ2a=9rV9."@?^G,hS_lQV63iAEeRE#o<f%0p-X>5[1,K,7!>;A/$qm.G$PmF@C1f(,f#H`R5:6"GUXKE`fp\DP&uiJ5e7513lV#%?lE@h%'uQ^)Jjp=5VYj/GfFBFUeDa2>FBE[1\3K[15T-9c.!\Th#a]R)R`u0#??>`WN_g=a[5o2WQ`iE$kpLQ0%8Uc+r5DH.`9Qq*l72D0Zh@<iF4j,Md1#a2%_c%cB$bZs#@Z._em0=54![2p1`SeKQSf<lQ%!K-*e0=G`%'gHFT9'=dKAj^PjIbrlhn8#Pc4_on+[rna*K2(Ce[6:ZgmEit<+>)-*Q=43kuiI&K1-_nYXZ3RJa;9m!?"&;"Idc,%R''d-E#jFaYVoZ]c!m5M?^BTLRg\WX@gAS&3^m%fbYc/-PW)nZGCSEGs!WM^s(daNWnJZ%W9DB:lFB5`_C-!=j?HqM7?;FLdR/,`/dg6cYo<\=h0:S8$U',[#HJl@MDk*tg*`lb!;8muQ'F]=G[BEj#=N*M&cFp>K6?\=1)7rDXI_-*opl>^blkJ!H#XW[<O)%&=b9\\kF-C&RR,]=79U3_kC=juuUGN-*6\&N4&+7r'j,a,2g<hFKETPR/.j`qWeQim?NbY'7N4p(XPVQ`j;RXd'@UOMhJq_#dS#n?mYmf-/"N"9LkV_D94ZGN5&kTkSYb\@qT'nE<V\k1&,W$:rP3$dj'E[Uuij'iU>cl$CFl5EG#Fp*<$p<c;%,E[;Dn+t\1N;^hUGt8\F#Sq0XP[Xq,&!>O".P;-1W\9hqI$?),]A3]oE^.\:247sc'IYD#6Bm*fKd]F%QW"I?WUD26?l\9Q"tq;(7`LXCNXfY^YqLiQdG-#L6C&UBg%m,>]bmtTM'RNkV]f9ar)m^[?Xf1:Ml$\'`hnQDCg]5,n9CD5rZkn@XX*BG=P164Bb2!R\oHg,1DqNe4Q_L!n2)&Y.s+AsWdVqYrUsqAQuBC6[al1&)MPE:lXP6o?eN@eUR6h'\_u.a0oD=nW+d$BGe%1o/<ko#MO-,8G'`Nk4LI7ppWi!,HC8sT,O/iF::sd#16QMAOUU%!n\f=dfU%d:c2seclqF>C]dlb<cfU'4^Q?S@3ETMP0*lu)%)4DR!B/"a:ThE;rZ.)f[9'n3]?Y)WRL_@H(go'&/$)WJi&PkN(GQQ?)7<sk9#iufEj,SjVr?b:C+q7*UX_&7&,JY+"O16\g0ZqDG40VSWBc`%@IE"=84h=s(JB[i^.;-#fF&/:9Tq5h4-Cpp(0mM#1/?ZX0[>E[`RHtG)g:UX-k,?<.MKju4Q?.eVAF<$]sH.L6X4Rj7K-!Z!.1lSMpqmp:"(i3[l2!ghd0p6R/Ni>,!_/Ni;<aYi9'6Sq!p0OZ7rH&'4,J0mGDX:IL3S2k<ECmR'6kWm_@=qmIfh>rQpmRMClPgTd2_RF;"F:81sG:(M3N7`^m:N)C)mYRGR8\k'V)a)P^"7A=LR%HNcE"+:PRQ^#1=@n_!/MH?[^rEm?%unI\p6+@4*#X=TeiD*FL/cKlG:g??tTd3+iErq[S>ZYFYUHom4@Qet.Bh:P.n<3JYb-AaMdB@q+1*nn[<q28@sMSdDtnHs'rKgdZjCV4G*:iTEo1;.;BhngGRRmu@Ws$2qIL-U3Y/@5:C7@i/>`Tdm2G[KqfZ,_-K!*B1&%`i=D~>
+endstream
+endobj
+14 0 obj
+<<
+/F1 15 0 R
+/F2 16 0 R
+>>
+endobj
+15 0 obj
 <<
 /BaseFont /Helvetica
 /Encoding /WinAnsiEncoding
@@ -140,7 +166,7 @@ endobj
 /Type /Font
 >>
 endobj
-14 0 obj
+16 0 obj
 <<
 /BaseFont /Helvetica-Bold
 /Encoding /WinAnsiEncoding
@@ -150,28 +176,30 @@ endobj
 >>
 endobj
 xref
-0 15
+0 17
 0000000000 65535 f 
 0000000015 00000 n 
 0000000094 00000 n 
 0000000153 00000 n 
 0000000202 00000 n 
-0000000442 00000 n 
-0000000658 00000 n 
-0000000929 00000 n 
-0000001200 00000 n 
-0000001433 00000 n 
-0000001707 00000 n 
-0000001982 00000 n 
-0000003242 00000 n 
-0000003286 00000 n 
-0000003394 00000 n 
+0000000456 00000 n 
+0000000689 00000 n 
+0000000905 00000 n 
+0000001178 00000 n 
+0000001454 00000 n 
+0000001718 00000 n 
+0000001987 00000 n 
+0000002252 00000 n 
+0000002513 00000 n 
+0000004838 00000 n 
+0000004882 00000 n 
+0000004990 00000 n 
 trailer
 <<
-/Size 15
+/Size 17
 /Root 3 0 R
 /Info 1 0 R
 >>
 startxref
-3507
+5103
 %%EOF
