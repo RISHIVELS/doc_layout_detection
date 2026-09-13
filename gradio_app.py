@@ -40,23 +40,16 @@ PALETTE = [
 _detector: Detector | None = None
 
 
-@_gpu_decorator
-def _predict_on_gpu(predict_fn, image, conf: float = 0.25):
-    # Has to be a real, literally-decorated top-level function - ZeroGPU
-    # scans the source at startup for an @spaces.GPU function and doesn't
-    # see decoration applied dynamically at runtime (which is what my
-    # first attempt did, wrapping detector.predict inside get_detector()).
-    #
-    # Takes the original predict method as a plain argument rather than
-    # the Detector instance - calling detector.predict(...) here would
-    # infinitely recurse, since get_detector() below reassigns that exact
-    # attribute to a lambda that calls back into this function.
-    return predict_fn(image, conf=conf)
-
-
 def get_detector() -> Detector:
     # module-level singleton, same reasoning as main.py's get_detector -
-    # loads once per process, not per request
+    # loads once per process, not per request. Left completely unmodified
+    # (no monkeypatching) - ZeroGPU's @spaces.GPU spawns a separate worker
+    # process for the actual GPU call, and everything crossing that
+    # boundary gets pickled. A bound method captured in a closure (my
+    # first two attempts) either can't be pickled at all, or - when it
+    # can - resolves to whatever the instance's current attribute value
+    # is on the other side, which is fragile either way. Passing only
+    # plain data (the image, a float) sidesteps the whole problem.
     global _detector
     if _detector is None:
         _detector = Detector()
@@ -64,14 +57,35 @@ def get_detector() -> Detector:
             _detector.load()
         except FileNotFoundError:
             pass  # surfaced in the UI instead of crashing the app
-        else:
-            # capture the real bound method before overwriting the
-            # attribute - route every predict() call (from run_detect
-            # directly, or from inside the reasoning pipeline) through
-            # the properly decorated function above
-            original_predict = _detector.predict
-            _detector.predict = lambda image, conf=0.25: _predict_on_gpu(original_predict, image, conf)
     return _detector
+
+
+@_gpu_decorator
+def _predict_on_gpu(image, conf: float = 0.25):
+    # The only thing decorated with @spaces.GPU, and it has to be exactly
+    # this: a real top-level function (ZeroGPU scans source at startup
+    # for one - dynamic decoration isn't detected), taking only plain,
+    # picklable arguments. It reaches the detector via the module-level
+    # getter rather than having one passed in.
+    return get_detector().predict(image, conf=conf)
+
+
+class _GPUDetectorProxy:
+    """Stands in for a Detector wherever one is expected (run_ask passes
+    this to the reasoning pipeline) but routes predict() through the
+    properly decorated module-level function above instead of calling
+    the real method directly - same reason as the getter's docstring."""
+
+    @property
+    def is_loaded(self) -> bool:
+        return get_detector().is_loaded
+
+    @property
+    def query_budget(self) -> int:
+        return get_detector().query_budget
+
+    def predict(self, image, conf: float = 0.25):
+        return _predict_on_gpu(image, conf=conf)
 
 
 def draw_detections(image: Image.Image, detections) -> Image.Image:
@@ -95,13 +109,12 @@ def draw_detections(image: Image.Image, detections) -> Image.Image:
 
 
 def run_detect(image: Image.Image):
-    detector = get_detector()
-    if not detector.is_loaded:
+    if not get_detector().is_loaded:
         return None, "Model not loaded - check MODEL_PATH/MODEL_URL.", None
     if image is None:
         return None, "Upload an image first.", None
 
-    detections, inference_ms = detector.predict(image)
+    detections, inference_ms = _predict_on_gpu(image)
     annotated = draw_detections(image, detections)
     table = [[d.class_name, round(d.confidence, 3)] for d in sorted(detections, key=lambda d: -d.confidence)]
     summary = f"{len(detections)} detections in {inference_ms:.1f} ms"
@@ -109,15 +122,14 @@ def run_detect(image: Image.Image):
 
 
 def run_ask(image: Image.Image, question: str):
-    detector = get_detector()
-    if not detector.is_loaded:
+    if not get_detector().is_loaded:
         return "Model not loaded - check MODEL_PATH/MODEL_URL.", {}
     if image is None or not question:
         return "Upload an image and enter a question.", {}
     if not os.environ.get("GROQ_API_KEY"):
         return "GROQ_API_KEY not set - the reasoning layer needs it.", {}
 
-    response = answer_question(image=image, question=question, detector=detector)
+    response = answer_question(image=image, question=question, detector=_GPUDetectorProxy())
     return response.answer, response.reasoning_trace
 
 
