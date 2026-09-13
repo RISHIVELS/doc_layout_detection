@@ -207,6 +207,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+### `GET /health`
+
+```bash
+curl http://localhost:8000/health
+```
+
+```json
+{"status": "ok", "model_loaded": true, "model_version": "rtdetr-l-doclaynet-v1"}
+```
+
+Reports whether the weights actually loaded, not just whether the process
+is up — a container running without usable weights answers `200` here with
+`model_loaded: false` rather than failing to start.
+
 ### `POST /detect`
 
 ```bash

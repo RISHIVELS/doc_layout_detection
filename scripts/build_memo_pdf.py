@@ -40,20 +40,30 @@ def parse_blocks(source: str) -> list[str]:
     """Splits on blank lines so a markdown paragraph hand-wrapped across
     several source lines becomes one flowing block, not one Paragraph per
     line - that was inflating the page count with extra gaps between
-    what should be the same paragraph."""
+    what should be the same paragraph.
+
+    A line starting with '- ' also opens a new block, so consecutive
+    bullets (which have no blank line between them) don't get merged into
+    one run-on paragraph. Their own wrapped continuation lines still fold
+    into the bullet they belong to."""
     blocks, current = [], []
+
+    def flush():
+        if current:
+            blocks.append(" ".join(current))
+            current.clear()
+
     for raw_line in source.splitlines():
         line = raw_line.strip()
         if not line:
-            if current:
-                blocks.append(" ".join(current))
-                current = []
+            flush()
             continue
         if line.startswith("> "):
             line = line[2:]  # blockquote marker - stray without this on wrapped lines
+        if line.startswith("- ") or line.startswith("#"):
+            flush()  # bullets and headings each start their own block
         current.append(line)
-    if current:
-        blocks.append(" ".join(current))
+    flush()
     return blocks
 
 
@@ -106,44 +116,48 @@ def main() -> None:
         spaceAfter=10, alignment=1,
     )
     h2_style = ParagraphStyle(
-        "MemoH2", parent=styles["Heading2"], fontSize=11, spaceBefore=8, spaceAfter=3,
+        "MemoH2", parent=styles["Heading2"], fontSize=10.5, spaceBefore=7, spaceAfter=3,
         textColor="black",
     )
     body_style = ParagraphStyle(
-        "MemoBody", parent=styles["Normal"], fontSize=9, leading=11.5, spaceAfter=5,
+        "MemoBody", parent=styles["Normal"], fontSize=8.6, leading=10.8, spaceAfter=4.5,
         textColor="black",
+    )
+    bullet_style = ParagraphStyle(
+        "MemoBullet", parent=body_style, leftIndent=10, bulletIndent=0, spaceAfter=3,
+        bulletFontSize=8.6,
     )
 
     story = []
-    blocks = parse_blocks(source)
-    title_done = False
-    for block in blocks:
-        if block.startswith("# "):
+    for block in parse_blocks(source):
+        # Explicit placeholder rather than sniffing for a prose string.
+        # The old version triggered on "mAP50-95 = 0.412" appearing in the
+        # text, which silently dropped the whole table the moment I
+        # reworded that sentence - exactly the kind of failure that ships
+        # unnoticed because nothing errors.
+        if block.strip() == "{{RESULTS_TABLE}}":
+            story.append(Spacer(1, 4))
+            story.append(results_table(metrics))
+            story.append(Spacer(1, 8))
+        elif block.startswith("# "):
             story.append(Paragraph(inline_markdown_to_xml(block[2:]), title_style))
             story.append(Paragraph("RT-DETR-L fine-tuned on DocLayNet, evaluated on a held-out test split", subtitle_style))
-            title_done = True
         elif block.startswith("## "):
-            heading_text = block[3:]
-            story.append(Paragraph(inline_markdown_to_xml(heading_text), h2_style))
-            # drop the real results table in right after the evaluation
-            # section's heading, before its body text
-            if heading_text.startswith("3. Evaluation"):
-                pass  # table inserted after this section's paragraphs below instead
+            story.append(Paragraph(inline_markdown_to_xml(block[3:]), h2_style))
+        elif block.startswith("- "):
+            # bulletText is what actually draws the marker - the style's
+            # indent alone would just give silently un-bulleted text
+            story.append(Paragraph(inline_markdown_to_xml(block[2:]), bullet_style, bulletText="•"))
         else:
             story.append(Paragraph(inline_markdown_to_xml(block), body_style))
-            # insert the table right after the first paragraph of section 3
-            if "mAP50-95 = 0.412" in block:
-                story.append(Spacer(1, 4))
-                story.append(results_table(metrics))
-                story.append(Spacer(1, 6))
 
     doc = BaseDocTemplate(
         str(out_path),
         pagesize=LETTER,
-        topMargin=0.55 * inch,
-        bottomMargin=0.55 * inch,
-        leftMargin=0.7 * inch,
-        rightMargin=0.7 * inch,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+        leftMargin=0.65 * inch,
+        rightMargin=0.65 * inch,
         title="",
         author="",
         subject="",
