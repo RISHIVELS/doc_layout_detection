@@ -6,6 +6,10 @@ between what it can see and what it can't.
 
 Built for RAP's Pre-Hackathon Screening (Track: CV + Applied ML Engineering).
 
+> **Model weights (`best.pt`, 66 MB) are not in this repo — too large for
+> git.** **[⬇ Download here](https://github.com/RISHIVELS/doc_layout_detection/releases/download/weights-v1/best.pt)**
+> and place at `weights/best.pt` before running anything below.
+
 ![Detection results](assets/demo_detect_result.png)
 
 ## What this is
