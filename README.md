@@ -351,7 +351,8 @@ scripts/
   train.py                RT-DETR fine-tuning
   evaluate.py             per-class/per-category metrics, leakage/saturation checks
   mine_failures.py        ranks and renders worst test predictions
-streamlit_app.py         demo UI (same pipeline as the API)
+gradio_app.py            demo UI deployed live on HF Spaces (ZeroGPU)
+streamlit_app.py         demo UI for local use / Docker
 notebooks/kaggle_train.ipynb   Kaggle-ready training notebook
 memo/                    written memo + full build log
 reports/                 real evaluation results from this training run
