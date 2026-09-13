@@ -1,5 +1,9 @@
 # Memo — Constrained Document Layout Detection & Reasoning API
 
+[GitHub repository](https://github.com/RISHIVELS/doc_layout_detection) ·
+[Live demo](https://huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD) ·
+[Evaluation report](https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/evaluation_report.pdf)
+
 ## 1. Domain, dataset, and why
 
 I chose document layout analysis — detecting structural regions (tables,
@@ -14,7 +18,7 @@ Partners builds — RAPFlow's stated purpose is automated extraction from
 unstructured documents, and layout detection is the perception stage
 underneath that.
 
-**Dataset:** `pierreguillou/DocLayNet-base` (Hugging Face), a 10% subset of
+**Dataset:** [`pierreguillou/DocLayNet-base`](https://huggingface.co/datasets/pierreguillou/DocLayNet-base) (Hugging Face), a 10% subset of
 IBM Research's DocLayNet — 8,057 pages, expert-annotated, CDLA-Permissive-1.0
 license, spanning 6 document categories (financial reports, scientific
 articles, laws/regulations, tenders, manuals, patents). I used this subset
@@ -24,7 +28,8 @@ defensible against a one-day window. Same annotation quality, ~8x smaller.
 
 One real data hazard: the dataset's `bboxes_block` field repeats each
 region's box once per text line it contains, so a naive read of a 40-region
-page produces ~1,100 duplicate annotations. `scripts/prepare_dataset.py`
+page produces ~1,100 duplicate annotations.
+[`scripts/prepare_dataset.py`](https://github.com/RISHIVELS/doc_layout_detection/blob/main/scripts/prepare_dataset.py)
 deduplicates on `(box, category)` before writing YOLO labels and reports
 the dedupe ratio per split.
 
@@ -35,7 +40,8 @@ rather than re-stratifying myself. This is the reproducible choice —
 comparable to published DocLayNet baselines — but it means inheriting
 whatever leakage that split has. I measured it rather than assuming:
 **0% of test pages share a source PDF with the training set** (see
-`reports/metrics.json:split_leakage`). The split is clean.
+[`reports/metrics.json`](https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/metrics.json),
+`split_leakage`). The split is clean.
 
 ## 3. Evaluation and what it does / doesn't tell you
 
@@ -71,7 +77,8 @@ my hypothesis from "small objects fail" to "small *and rare* objects fail;
 small-but-frequent-and-positionally-consistent ones are fine."
 
 **3. Dense repeated-entry layouts produce duplicate, jittery boxes**
-(`reports/failures/01_test_000035_err120.png`, financial_reports, the
+([image](https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/failure_examples/dense_entries_financial_report.png),
+financial_reports, the
 worst page overall: 38 missed, 82 false positives). This page is a bank's
 organizational directory — ~25 near-identical repeated `Section-header`/
 `Text` entry pairs stacked in two columns. Ground truth has one clean box
@@ -81,11 +88,13 @@ cleanly separate many visually near-identical, tightly packed instances —
 a genuine limitation of a fixed-query architecture on repetitive layouts,
 not a training bug. The same pattern recurs on a scientific article's
 reference list and on individual formula blocks
-(`reports/failures/06_test_000447_err56.png`), confirming it generalizes
-across document types rather than being specific to financial reports.
+([image](https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/failure_examples/dense_entries_scientific_article.png)),
+confirming it generalizes across document types rather than being
+specific to financial reports.
 
 **4. Composite `Picture` regions get fragmented into overlapping sub-boxes**
-(`reports/failures/04_test_000425_err61.png`, patents: 0 missed, 0
+([image](https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/failure_examples/composite_picture_fragmentation.png),
+patents: 0 missed, 0
 misclassified, 61 false positives — the cleanest signature in the run).
 Each ground-truth `Picture` is one chemical structure diagram; the model
 predicts 2–3 overlapping `Picture` boxes per diagram instead of one,

@@ -20,9 +20,16 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def inline_markdown_to_xml(text: str) -> str:
-    """**bold** -> <b>bold</b>, `code` -> monospace font tag, *italic* ->
-    <i>italic</i>. Code spans first so a bold marker inside one (there
-    aren't any here, but just in case) doesn't get touched."""
+    """`code` -> monospace font tag, [text](url) -> a real clickable
+    reportlab <link>, **bold** -> <b>, *italic* -> <i>.
+
+    Links first, before bold/italic - markdown link syntax uses brackets
+    and parens, not asterisks, but I want the URL itself protected from
+    the code-span regex (a URL can contain backticks in theory) and
+    resolved before anything else touches the surrounding text. Without
+    this, [text](url) was silently passing through as plain literal
+    text with the brackets still in it - no link ever got into the PDF."""
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<link href="\2" color="#1a56db">\1</link>', text)
     text = re.sub(r"`([^`]+)`", r'<font face="Courier">\1</font>', text)
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"\*([^*]+)\*", r"<i>\1</i>", text)
