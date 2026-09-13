@@ -36,6 +36,3 @@ groq>=0.11
 matplotlib>=3.8
 pandas>=2.2
 
-# --- Dev ---
-pytest>=8.0
-httpx>=0.27
