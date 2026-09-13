@@ -23,6 +23,7 @@ tqdm>=4.66
 # Docker, where SDK choice doesn't matter.
 streamlit>=1.38
 gradio>=4.44
+spaces>=0.30  # only does anything on an actual HF ZeroGPU Space
 
 # --- API ---
 python-dotenv>=1.0

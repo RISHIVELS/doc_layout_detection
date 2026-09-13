@@ -19,6 +19,19 @@ from app.detector import Detector
 from app.reasoning.pipeline import answer_question
 from scripts._render_utils import load_label_font
 
+try:
+    # only meaningful on an actual HF ZeroGPU Space - it's what tells the
+    # platform to allocate a real GPU for the duration of the decorated
+    # call, then release it. A no-op import failure anywhere else (local
+    # runs, Docker) just means we fall back to whatever device torch
+    # picks on its own.
+    import spaces
+
+    _gpu_decorator = spaces.GPU
+except ImportError:
+    def _gpu_decorator(fn):
+        return fn
+
 PALETTE = [
     "#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4",
     "#46f0f0", "#f032e6", "#bcf60c", "#fabebe", "#008080",
@@ -37,6 +50,11 @@ def get_detector() -> Detector:
             _detector.load()
         except FileNotFoundError:
             pass  # surfaced in the UI instead of crashing the app
+        else:
+            # wrap predict() so every call (from run_detect directly, or
+            # from inside the reasoning pipeline) requests the shared
+            # ZeroGPU allocation for its duration - not the whole process
+            _detector.predict = _gpu_decorator(_detector.predict)
     return _detector
 
 
