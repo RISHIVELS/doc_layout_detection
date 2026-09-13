@@ -16,8 +16,13 @@ pillow>=10.0
 numpy>=1.26
 tqdm>=4.66
 
-# --- Streamlit demo UI (for Hugging Face Spaces) ---
+# --- Demo UIs (for Hugging Face Spaces) ---
+# gradio: current HF Space creation flow only offers Gradio/Docker/Static
+# as SDKs, no standalone Streamlit option - gradio_app.py is the one that
+# actually gets deployed there. streamlit_app.py stays for local use /
+# Docker, where SDK choice doesn't matter.
 streamlit>=1.38
+gradio>=4.44
 
 # --- API ---
 python-dotenv>=1.0
