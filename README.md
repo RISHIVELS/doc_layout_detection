@@ -70,7 +70,32 @@ Trained RT-DETR-L for 15 epochs on a Tesla T4 (2.27h), evaluated on the
 instances) rather than simply small. `Page-footer` is nearly as thin as
 `Footnote` but has 8x more training instances and a highly consistent
 position, and it's one of the *best*-performing classes. Full root-cause
-analysis with rendered evidence in the memo.
+analysis in the memo — three of the five cases are backed by actual
+rendered GT-vs-prediction images, not just numbers (ground truth on the
+left, prediction on the right):
+
+<img src="reports/failure_examples/dense_entries_financial_report.png" width="720">
+
+Dense repeated-entry layouts (here, a bank's organizational directory)
+produce duplicate, overlapping boxes instead of one per entry — worst
+page in the run (38 missed, 82 false positives).
+
+<img src="reports/failure_examples/composite_picture_fragmentation.png" width="720">
+
+A composite `Picture` (a chemical diagram) gets split into 2–3 overlapping
+boxes instead of one — explains `Picture`'s low precision (0.416) despite
+reasonable recall (0.622).
+
+<img src="reports/failure_examples/dense_entries_scientific_article.png" width="720">
+
+The same duplicate-box failure recurs on a scientific article's reference
+list and on individual formula blocks — confirms it's a general
+limitation of the fixed-query architecture, not a one-off quirk of the
+financial-report case above.
+
+(Full set of 25 mined failure renders: `reports/failures/` — gitignored
+as a large batch; these three are tracked separately in
+`reports/failure_examples/` as the cited evidence.)
 
 **Per-document-category mAP50** (does the model generalize, or did it just
 learn financial reports?):

@@ -79,7 +79,10 @@ per entry; the prediction shows heavily overlapping, offset duplicate boxes
 at scattered confidence (0.25–0.85). At 640px, the model appears unable to
 cleanly separate many visually near-identical, tightly packed instances —
 a genuine limitation of a fixed-query architecture on repetitive layouts,
-not a training bug.
+not a training bug. The same pattern recurs on a scientific article's
+reference list and on individual formula blocks
+(`reports/failures/06_test_000447_err56.png`), confirming it generalizes
+across document types rather than being specific to financial reports.
 
 **4. Composite `Picture` regions get fragmented into overlapping sub-boxes**
 (`reports/failures/04_test_000425_err61.png`, patents: 0 missed, 0
