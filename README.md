@@ -83,7 +83,10 @@ learn financial reports?):
 300-query budget (max regions on any page: 95); 0% of test pages share a
 source PDF with the training set.
 
-Full numbers: [`reports/metrics.json`](reports/metrics.json). Run metadata
+**[Visual evaluation report (PDF)](reports/evaluation_report.pdf)** — the
+numbers above, charted.
+
+Raw numbers: [`reports/metrics.json`](reports/metrics.json). Run metadata
 (hyperparameters, hardware, wall-clock time): [`reports/run_metadata.json`](reports/run_metadata.json).
 
 ## Architecture
