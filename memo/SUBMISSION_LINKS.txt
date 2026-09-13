@@ -1,0 +1,34 @@
+RAP Pre-Hackathon Screening Submission
+Constrained Object Detection & Reasoning API
+
+Project:
+Document Layout Detection & Reasoning API (RT-DETR on DocLayNet)
+
+GitHub Repository:
+https://github.com/RISHIVELS/doc_layout_detection
+
+Trained Model Weights (GitHub Release asset - permanent, version-tagged):
+https://github.com/RISHIVELS/doc_layout_detection/releases/download/weights-v1/best.pt
+
+Model filename:
+best.pt
+
+Model placement after download:
+weights/best.pt
+
+Live Demo (no setup needed - upload a page, see real detection and Q&A):
+https://huggingface.co/spaces/RISHIVEL/RAP_DocLayout_DetectionD
+
+Visual Evaluation Report (charts, generated from the real run):
+https://github.com/RISHIVELS/doc_layout_detection/blob/main/reports/evaluation_report.pdf
+
+API:
+GET  /health
+POST /detect
+POST /ask
+
+Setup and API usage instructions:
+See README.md in the GitHub repository.
+
+Written Memo:
+MEMO.pdf
