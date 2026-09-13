@@ -41,4 +41,6 @@ groq>=0.11
 # --- Evaluation / reporting ---
 matplotlib>=3.8
 pandas>=2.2
+reportlab>=4.0  # scripts/build_memo_pdf.py
+pypdf>=4.0      # metadata stripping in build_report.py / build_memo_pdf.py
 
