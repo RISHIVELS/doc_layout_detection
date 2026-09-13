@@ -94,11 +94,29 @@ def results_table(metrics: dict) -> Table:
     return table
 
 
-def _footer(canvas, doc):
+BOARD_INSET = 0.38 * inch
+RULE_GREY = colors.HexColor("#c9c9c9")
+
+
+def _board_and_footer(canvas, doc):
+    """Ruled border plus the page number, drawn together because both live
+    outside the flowable frame. Two rules rather than one - a 1.1pt outer
+    and a hairline inside it; a single heavy box reads like a certificate.
+    Same frame as the submission cover sheet, so the two documents look
+    like one set."""
     canvas.saveState()
-    canvas.setFont("Helvetica", 8)
-    canvas.setFillColor(colors.grey)
-    canvas.drawCentredString(LETTER[0] / 2, 0.35 * inch, f"Page {doc.page}")
+    width, height = LETTER
+    canvas.setStrokeColor(colors.black)
+    canvas.setLineWidth(1.1)
+    canvas.rect(BOARD_INSET, BOARD_INSET, width - 2 * BOARD_INSET, height - 2 * BOARD_INSET)
+    canvas.setLineWidth(0.4)
+    canvas.setStrokeColor(RULE_GREY)
+    inner = BOARD_INSET + 4
+    canvas.rect(inner, inner, width - 2 * inner, height - 2 * inner)
+
+    canvas.setFont("Helvetica", 7.6)
+    canvas.setFillColor(colors.HexColor("#3d3d3d"))
+    canvas.drawCentredString(width / 2, BOARD_INSET + 14, f"{doc.page} / 2")
     canvas.restoreState()
 
 
@@ -113,23 +131,39 @@ def main() -> None:
     )
     subtitle_style = ParagraphStyle(
         "MemoSubtitle", parent=styles["Normal"], fontSize=9, textColor=colors.grey,
-        spaceAfter=10, alignment=1,
+        spaceAfter=8, alignment=1,
     )
     h2_style = ParagraphStyle(
-        "MemoH2", parent=styles["Heading2"], fontSize=10.5, spaceBefore=7, spaceAfter=3,
+        "MemoH2", parent=styles["Heading2"], fontSize=10, spaceBefore=6, spaceAfter=2.5,
         textColor="black",
     )
+    # Leading and paragraph gaps trimmed to buy back the vertical the board
+    # margins cost. 10.2 on 8.5pt is tight but still comfortably readable;
+    # anything below this started to look cramped on screen.
     body_style = ParagraphStyle(
-        "MemoBody", parent=styles["Normal"], fontSize=8.6, leading=10.8, spaceAfter=4.5,
+        "MemoBody", parent=styles["Normal"], fontSize=8.5, leading=10.2, spaceAfter=3.6,
         textColor="black",
     )
     bullet_style = ParagraphStyle(
-        "MemoBullet", parent=body_style, leftIndent=10, bulletIndent=0, spaceAfter=3,
-        bulletFontSize=8.6,
+        "MemoBullet", parent=body_style, leftIndent=10, bulletIndent=0, spaceAfter=2.4,
+        bulletFontSize=8.5,
+    )
+    # The repo/demo/report row sits directly under the title, so it should
+    # sit on the same centre line as the title and subtitle - left-aligned
+    # it read as the first line of body text rather than as a header.
+    links_style = ParagraphStyle(
+        "MemoLinks", parent=body_style, alignment=1, spaceBefore=1, spaceAfter=9,
     )
 
     story = []
+    links_row_next = False
     for block in parse_blocks(source):
+        if links_row_next:
+            # only the one block immediately after the title
+            links_row_next = False
+            if not block.startswith(("#", "- ")):
+                story.append(Paragraph(inline_markdown_to_xml(block), links_style))
+                continue
         # Explicit placeholder rather than sniffing for a prose string.
         # The old version triggered on "mAP50-95 = 0.412" appearing in the
         # text, which silently dropped the whole table the moment I
@@ -142,6 +176,7 @@ def main() -> None:
         elif block.startswith("# "):
             story.append(Paragraph(inline_markdown_to_xml(block[2:]), title_style))
             story.append(Paragraph("RT-DETR-L fine-tuned on DocLayNet, evaluated on a held-out test split", subtitle_style))
+            links_row_next = True
         elif block.startswith("## "):
             story.append(Paragraph(inline_markdown_to_xml(block[3:]), h2_style))
         elif block.startswith("- "):
@@ -154,17 +189,20 @@ def main() -> None:
     doc = BaseDocTemplate(
         str(out_path),
         pagesize=LETTER,
-        topMargin=0.5 * inch,
-        bottomMargin=0.5 * inch,
-        leftMargin=0.65 * inch,
-        rightMargin=0.65 * inch,
+        # Pulled in from 0.5/0.65 to clear the board rules. That costs
+        # roughly five lines of vertical run over two pages, paid back by
+        # the tighter leading below - it still lands on exactly 2 pages.
+        topMargin=0.62 * inch,
+        bottomMargin=0.72 * inch,
+        leftMargin=0.78 * inch,
+        rightMargin=0.78 * inch,
         title="",
         author="",
         subject="",
         creator="",
     )
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="normal")
-    doc.addPageTemplates([PageTemplate(id="memo", frames=[frame], onPage=_footer)])
+    doc.addPageTemplates([PageTemplate(id="memo", frames=[frame], onPage=_board_and_footer)])
     doc.build(story)
 
     # reportlab still stamps its own Producer string and a CreationDate/
